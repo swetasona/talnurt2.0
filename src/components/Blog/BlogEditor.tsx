@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { FaImage, FaSpinner } from 'react-icons/fa';
 
@@ -7,9 +7,6 @@ const ReactQuill = dynamic(() => import('react-quill'), {
   ssr: false,
   loading: () => <div className="h-60 border border-gray-300 rounded-md animate-pulse bg-gray-50"></div>
 });
-
-// Import styles but only on client side
-import 'react-quill/dist/quill.snow.css';
 
 export interface BlogFormData {
   title: string;
@@ -38,6 +35,14 @@ const BlogEditor: React.FC<BlogEditorProps> = ({
   const [imageUploading, setImageUploading] = useState(false);
   const [imageError, setImageError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Import Quill styles only on client side
+  useEffect(() => {
+    // This ensures the CSS is only loaded in the browser, not during SSR
+    if (typeof window !== 'undefined') {
+      require('react-quill/dist/quill.snow.css');
+    }
+  }, []);
 
   // Quill editor modules and formats configuration
   const modules = {

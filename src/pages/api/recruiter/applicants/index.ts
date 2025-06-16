@@ -58,6 +58,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         job_postings: true,
       },
       orderBy: {
+        applied_on: 'desc',
+      },
     });
     
     // Format the applications for the response
