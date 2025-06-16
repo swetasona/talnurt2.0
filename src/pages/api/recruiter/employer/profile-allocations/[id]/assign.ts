@@ -2,11 +2,13 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { getConnection, releaseConnection } from '@/lib/db-connection-manager';
 import { authOptions } from '@/pages/api/auth/[...nextauth]';
-import { prisma } from '@/lib/prisma';
+import { PrismaClient } from '@prisma/client';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Initialize connection success flag
   let connectionSuccessful = false;
+  // Get a database connection - but don't reassign to the imported prisma
+  let prismaClient: PrismaClient;
 
   try {
     // Only allow POST method
@@ -15,19 +17,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Get a database connection
-    prisma = await getConnection();
+    prismaClient = await getConnection();
 
     // Get the session to verify the user is authenticated
     const session = await getServerSession(req, res, authOptions);
 
     if (!session || !session.user?.id) {
-      releaseConnection(); // Release connection before returning
+      releaseConnection(); // No parameters needed
       return res.status(401).json({ error: 'Unauthorized. Please log in.' });
     }
 
     // Check if user is an employer or manager
     if (session.user.role !== 'employer' && session.user.role !== 'manager') {
-      releaseConnection(); // Release connection before returning
+      releaseConnection(); // No parameters needed
       return res.status(403).json({ error: 'Access denied. Only employers and managers can access this resource.' });
     }
 
@@ -48,7 +50,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Get user's company ID
-    const user = await prisma.user.findUnique({
+    const user = await prismaClient.user.findUnique({
       where: { id: session.user.id },
       select: { company_id: true }
     });
@@ -57,12 +59,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     connectionSuccessful = true;
 
     if (!user || !user.company_id) {
-      releaseConnection(); // Release connection before returning
+      releaseConnection(); // No parameters needed
       return res.status(404).json({ error: 'Company not found for this user.' });
     }
 
     // Verify the allocation belongs to the user's company
-    const allocation = await prisma.profileAllocation.findUnique({
+    const allocation = await prismaClient.profileAllocation.findUnique({
       where: { id },
       include: {
         createdBy: {
@@ -82,7 +84,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Verify all employees belong to the same company
-    const employees = await prisma.user.findMany({
+    const employees = await prismaClient.user.findMany({
       where: {
         id: { in: employeeIds },
         company_id: user.company_id
@@ -96,7 +98,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Check if any employees are already assigned to this allocation
-    const existingAllocations = await prisma.profileAllocationEmployee.findMany({
+    const existingAllocations = await prismaClient.profileAllocationEmployee.findMany({
       where: {
         profileAllocationId: id,
         employeeId: { in: employeeIds }
@@ -122,9 +124,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }));
 
     // Create the allocations in a transaction
-    await prisma.$transaction(
+    await prismaClient.$transaction(
       allocationsToCreate.map(allocation => 
-        prisma.profileAllocationEmployee.create({
+        prismaClient.profileAllocationEmployee.create({
           data: allocation
         })
       )
@@ -146,9 +148,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
     
     // Always release connection, even on error
-    if (prisma) {
-      releaseConnection();
-    }
+    releaseConnection();
     
     return res.status(500).json({ error: 'Failed to assign employees' });
   }
