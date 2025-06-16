@@ -93,6 +93,12 @@ const nextConfig = {
       },
     ]
   },
+
+  // Exclude problematic pages from static generation
+  exportPathMap: async function (defaultPathMap) {
+    delete defaultPathMap['/recruiter/employer/candidates/[id]/status'];
+    return defaultPathMap;
+  },
 };
 
 module.exports = nextConfig; 
