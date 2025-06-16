@@ -37,3 +37,21 @@ next-env.d.ts
 /uploads
 /public/uploads
 /tmp
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+/venv/
+/env/
+/.venv/
+/.env/
+/ENV/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+pythonenv*
