@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import RecruiterLayout from '@/components/Layout/RecruiterLayout';
-import { FaSearch, FaFilter, FaEye, FaDownload, FaUserPlus, FaSort, FaSortUp, FaSortDown, FaListAlt } from 'react-icons/fa';
+import { FaSearch, FaFilter, FaEye, FaDownload, FaUserPlus, FaSort, FaSortUp, FaSortDown, FaListAlt, FaTrash } from 'react-icons/fa';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
+import ConfirmationModal from '@/components/shared/ConfirmationModal';
 
 // Define interfaces for type safety
 interface ProfileAllocation {
@@ -53,6 +54,14 @@ const CandidateManagementPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState('');
   const [sortField, setSortField] = useState<string>('createdAt');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [deletingIds, setDeletingIds] = useState<string[]>([]);
+  
+  // Delete confirmation modal state
+  const [deleteConfirmation, setDeleteConfirmation] = useState({
+    isOpen: false,
+    allocationId: '',
+    allocationTitle: ''
+  });
   
   // Fetch profile allocations
   const fetchProfileAllocations = async () => {
@@ -154,6 +163,58 @@ const CandidateManagementPage: React.FC = () => {
       month: 'short',
       day: 'numeric'
     });
+  };
+
+  // Open delete confirmation modal
+  const openDeleteConfirmation = (e: React.MouseEvent, allocation: ProfileAllocation) => {
+    e.stopPropagation();
+    setDeleteConfirmation({
+      isOpen: true,
+      allocationId: allocation.id,
+      allocationTitle: allocation.jobTitle
+    });
+  };
+
+  // Close delete confirmation modal
+  const closeDeleteConfirmation = () => {
+    setDeleteConfirmation({
+      isOpen: false,
+      allocationId: '',
+      allocationTitle: ''
+    });
+  };
+  
+  // Handle profile allocation deletion
+  const handleDelete = async () => {
+    const id = deleteConfirmation.allocationId;
+    
+    try {
+      setDeletingIds(prev => [...prev, id]);
+      
+      const response = await fetch(`/api/recruiter/employer/profile-allocation/${id}`, {
+        method: 'DELETE',
+      });
+      
+      if (response.ok) {
+        toast.success('Profile allocation deleted successfully');
+        // Remove the deleted allocation from both state arrays
+        setProfileAllocations(prevAllocations => 
+          prevAllocations.filter(allocation => allocation.id !== id)
+        );
+        setFilteredAllocations(prevAllocations => 
+          prevAllocations.filter(allocation => allocation.id !== id)
+        );
+      } else {
+        const error = await response.json();
+        toast.error(error.error || 'Failed to delete profile allocation');
+      }
+    } catch (error) {
+      console.error('Error deleting profile allocation:', error);
+      toast.error('An error occurred while deleting the profile allocation');
+    } finally {
+      setDeletingIds(prev => prev.filter(item => item !== id));
+      closeDeleteConfirmation();
+    }
   };
 
   return (
@@ -293,8 +354,24 @@ const CandidateManagementPage: React.FC = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium" onClick={(e) => e.stopPropagation()}>
                         <Link href={`/recruiter/employer/profile-management/candidates/${allocation.id}`} className="text-blue-600 hover:text-blue-900 mr-3">
-                          <FaEye className="inline" /> View
+                          <FaEye className="inline mr-1" /> View
                         </Link>
+                                            <button
+                      onClick={(e) => openDeleteConfirmation(e, allocation)}
+                      disabled={deletingIds.includes(allocation.id)}
+                      className="text-red-600 hover:text-red-900 focus:outline-none ml-2 border border-red-300 px-2 py-1 rounded hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      aria-label="Delete profile allocation"
+                    >
+                      {deletingIds.includes(allocation.id) ? (
+                        <>
+                          <span className="inline-block w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin mr-1"></span> Deleting...
+                        </>
+                      ) : (
+                        <>
+                          <FaTrash className="inline mr-1" /> Delete
+                        </>
+                      )}
+                    </button>
                       </td>
                     </tr>
                   ))}
@@ -304,6 +381,23 @@ const CandidateManagementPage: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={deleteConfirmation.isOpen}
+        title="Delete Profile Allocation"
+        message={
+          <div>
+            <p>Are you sure you want to delete the profile allocation for <span className="font-semibold">{deleteConfirmation.allocationTitle}</span>?</p>
+            <p className="mt-2 text-sm text-gray-500">This action cannot be undone. All data associated with this allocation will be permanently removed.</p>
+          </div>
+        }
+        confirmText="Delete"
+        cancelText="Cancel"
+        confirmButtonType="danger"
+        onConfirm={handleDelete}
+        onCancel={closeDeleteConfirmation}
+      />
     </RecruiterLayout>
   );
 };
