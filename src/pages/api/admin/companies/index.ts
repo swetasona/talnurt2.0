@@ -73,7 +73,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           industry: industry || '',
           location: location || '',
           logo_url: logo_url || '',
-          website_url: website_url || '',
+          website: website_url || '',
           linkedin_url: linkedin_url || '',
           speciality: speciality || '',
           created_at: new Date(),

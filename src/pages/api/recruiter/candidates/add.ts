@@ -7,6 +7,9 @@ import fs from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 
+// Explicitly import File type from formidable
+import { File } from 'formidable';
+
 /**
  * IMPORTANT: This API handles candidates for profile allocations only.
  * These candidates are different from job applicants in the talent section.
@@ -69,7 +72,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
     // Parse the form data
-    const [fields, files] = await new Promise<[formidable.Fields<string>, formidable.Files<string>]>((resolve, reject) => {
+    const [fields, files] = await new Promise<[formidable.Fields, formidable.Files]>((resolve, reject) => {
       form.parse(req, (err, fields, files) => {
         if (err) {
           console.error("Form parsing error:", err);
@@ -124,22 +127,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       skills = skillsRaw.split(',').map((skill: string) => skill.trim()).filter(Boolean);
     }
 
-    // Process resume file
-    let resumePath = null;
-    const resumeFile = files.resume;
-    if (resumeFile && !Array.isArray(resumeFile) && 'filepath' in resumeFile) {
-      // Generate a unique filename
-      const fileExt = path.extname(resumeFile.originalFilename?.toString() || '');
+    // Handle resume file upload if provided
+    let resumeUrl = null;
+    if (files.resume) {
+      // Use proper typing for the file
+      const resumeFile = files.resume as unknown as File;
+      
+      // Now we can safely access properties with proper typing
+      const fileExt = path.extname(resumeFile.originalFilename || '');
       const fileName = `${uuidv4()}${fileExt}`;
       const finalPath = path.join(uploadsDir, fileName);
-
-      // Move the file to the uploads directory
-      fs.copyFileSync(resumeFile.filepath as string, finalPath);
-      fs.unlinkSync(resumeFile.filepath as string); // Remove the temp file
-
-      // Store the relative path
-      resumePath = `/uploads/${fileName}`;
-      console.log(`Resume uploaded to: ${resumePath}`);
+      
+      fs.mkdirSync(uploadsDir, { recursive: true });
+      fs.copyFileSync(resumeFile.filepath, finalPath);
+      fs.unlinkSync(resumeFile.filepath); // Remove the temp file
+      
+      resumeUrl = `/uploads/${fileName}`;
     }
 
     // Generate a unique ID for the candidate
@@ -153,7 +156,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         email,
         phone: phone || null,
         skills: JSON.stringify(skills),
-        resume_url: resumePath,
+        resume_url: resumeUrl,
         source: 'manual',
         user_id: null, // Not directly associated with a user
         created_at: new Date(),

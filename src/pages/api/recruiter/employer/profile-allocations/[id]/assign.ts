@@ -1,12 +1,12 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getServerSession } from 'next-auth';
+import { getServerSession } from 'next-auth/next';
 import { getConnection, releaseConnection } from '@/lib/db-connection-manager';
-import { authOptions } from '../../../../auth/[...nextauth]';
+import { authOptions } from '@/pages/api/auth/[...nextauth]';
+import { prisma } from '@/lib/prisma';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Initialize connection success flag
   let connectionSuccessful = false;
-  let prisma;
 
   try {
     // Only allow POST method
@@ -138,7 +138,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       alreadyAssignedCount: existingEmployeeIds.length
     });
   } catch (error) {
-    console.error('Error in assign API:', error);
+    console.error('Error assigning employees to allocation:', error);
     
     // Check if this is a database connection error
     if (!connectionSuccessful) {
@@ -150,6 +150,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       releaseConnection();
     }
     
-    return res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ error: 'Failed to assign employees' });
   }
 } 

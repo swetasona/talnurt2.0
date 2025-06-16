@@ -50,51 +50,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const applications = await prisma.applications.findMany({
       where,
       include: {
-        job_postings: {
-          select: {
-            id: true,
-            title: true,
-            company: true,
-            location: true,
-          },
-        },
         users: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            user_profile: {
-              select: {
-                resume_url: true,
-                phone_number: true,
-                linkedin_url: true,
-                github_url: true,
-              },
-            },
+          include: {
+            user_profile: true,
           },
         },
+        job_postings: true,
       },
       orderBy: {
-        applied_on: 'desc',
-      },
     });
     
     // Format the applications for the response
-    const formattedApplications = applications.map(app => ({
+    const formattedApplications = applications.map((app) => ({
       id: app.id,
+      status: app.status,
+      appliedOn: app.applied_on,
       jobId: app.job_id,
       jobTitle: app.job_postings.title,
       jobCompany: app.job_postings.company,
       jobLocation: app.job_postings.location,
-      applicantId: app.user_id,
+      userId: app.user_id,
       applicantName: app.users.name,
       applicantEmail: app.users.email,
       resumeUrl: app.users.user_profile?.resume_url || null,
       phoneNumber: app.users.user_profile?.phone_number || null,
-      linkedinUrl: app.users.user_profile?.linkedin_url || null,
-      githubUrl: app.users.user_profile?.github_url || null,
-      status: app.status,
-      appliedDate: app.applied_on,
+      linkedinUrl: app.users.user_profile?.linkedin || null,
+      githubUrl: app.users.user_profile?.github || null,
     }));
 
     return res.status(200).json(formattedApplications);

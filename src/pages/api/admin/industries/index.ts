@@ -56,17 +56,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       // Create the new industry
-      const newIndustry = await prisma.industries.create({
+      const industry = await prisma.industries.create({
         data: {
           id: uuidv4(),
           name,
-          description: description || '',
           created_at: new Date(),
           updated_at: new Date(),
         },
       });
 
-      return res.status(201).json(newIndustry);
+      return res.status(201).json(industry);
     } catch (error) {
       console.error('Error creating industry:', error);
       return res.status(500).json({ error: 'Failed to create industry' });

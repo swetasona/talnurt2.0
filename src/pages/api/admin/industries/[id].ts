@@ -78,8 +78,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const updatedIndustry = await prisma.industries.update({
         where: { id },
         data: {
-          name,
-          description: description || '',
+          name: name || '',
           updated_at: new Date(),
         },
       });

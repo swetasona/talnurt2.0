@@ -1,5 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { prisma } from '@/lib/prisma';
+import { v4 as uuidv4 } from 'uuid';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') {
@@ -18,21 +19,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       
       const company = await prisma.companies.create({
         data: {
+          id: uuidv4(),
           name,
           logo_url,
           industry,
-          website_url,
-          linkedin_url,
-          speciality,
           location,
-          description,
+          website: website_url,
+          created_at: new Date(),
+          updated_at: new Date(),
         },
       });
       
-      return res.status(201).json(company);
+      return res.status(201).json({ success: true, company });
     } catch (error) {
       console.error('Error creating company:', error);
-      return res.status(500).json({ error: 'Failed to create company' });
+      return res.status(500).json({ success: false, error: 'Failed to create company' });
     }
   }
   
@@ -40,24 +41,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     try {
       const { id, name, logo_url, industry, website_url, linkedin_url, speciality, location, description } = req.body;
       
-      const company = await prisma.companies.update({
+      const updatedCompany = await prisma.companies.update({
         where: { id },
         data: {
           name,
           logo_url,
           industry,
-          website_url,
-          linkedin_url,
-          speciality,
           location,
-          description,
+          website: website_url,
+          updated_at: new Date(),
         },
       });
       
-      return res.status(200).json(company);
+      return res.status(200).json({ success: true, company: updatedCompany });
     } catch (error) {
       console.error('Error updating company:', error);
-      return res.status(500).json({ error: 'Failed to update company' });
+      return res.status(500).json({ success: false, error: 'Failed to update company' });
     }
   }
   

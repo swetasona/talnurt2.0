@@ -85,6 +85,30 @@ async function getProfile(
     }
 
     // Format the data to match the UI expectations
+    const formattedData = {
+      id: userData.id,
+      name: userData.name,
+      email: userData.email,
+      phoneNumber: userData.user_profile?.phone_number || null,
+      location: userData.user_profile?.location || null,
+      headline: userData.user_profile?.headline || null,
+      summary: userData.user_profile?.summary || null,
+      availability: userData.user_profile?.availability || null,
+      jobTypePreference: userData.user_profile?.job_type_preference || null,
+      salaryExpectation: userData.user_profile?.salary_expectation || null,
+      willingToRelocate: userData.user_profile?.willing_to_relocate || false,
+      yearsOfExperience: userData.user_profile?.years_of_experience || null,
+      avatarUrl: userData.user_profile?.avatar_url || null,
+      resumeUrl: userData.user_profile?.resume_url || null,
+      linkedin: userData.user_profile?.linkedin || null,
+      github: userData.user_profile?.github || null,
+      twitter: userData.user_profile?.twitter || null,
+      website: userData.user_profile?.website || null,
+      portfolio: userData.user_profile?.portfolio || null,
+      // Remove fields that don't exist in the schema
+    };
+
+    // Format the data to match the UI expectations
     const responseData = {
       education: userData.user_education.map(edu => ({
         id: edu.id,
