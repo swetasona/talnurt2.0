@@ -207,3 +207,78 @@ The following deprecated parsers have been removed to simplify maintenance:
 - Legacy Python parser without transformer models
 
 All functionality is now consolidated in the transformer-based parser.
+
+## Deployment Instructions
+
+### AWS Deployment
+
+1. Clone the repository:
+   ```
+   git clone https://github.com/your-username/recruitment-portal.git
+   cd recruitment-portal
+   ```
+
+2. Configure environment variables:
+   ```
+   cp .env.example .env.production
+   nano .env.production
+   ```
+   Update the values to match your AWS environment.
+
+3. Run the setup script:
+   ```
+   ./aws-setup.sh
+   ```
+
+4. Access the application at your server's IP address.
+
+### Manual Deployment
+
+1. Install dependencies:
+   ```
+   npm install
+   ```
+
+2. Build the application:
+   ```
+   npm run build
+   ```
+
+3. Start the application:
+   ```
+   ./start.sh
+   ```
+
+## Environment Variables
+
+- `PORT`: The port to run the application on (default: 3001)
+- `HOSTNAME`: The hostname to bind to (default: 0.0.0.0)
+- `BASE_URL`: The base URL of the application
+- `API_URL`: The API URL
+- `DB_HOST`: Database host
+- `DB_USER`: Database user
+- `DB_PASSWORD`: Database password
+- `DB_NAME`: Database name
+- `DB_PORT`: Database port
+- `NEXTAUTH_SECRET`: Secret for NextAuth authentication
+- `NEXTAUTH_URL`: URL for NextAuth
+
+## Troubleshooting
+
+If you encounter issues:
+
+1. Check the logs:
+   ```
+   pm2 logs talnurt
+   ```
+
+2. Verify the database connection:
+   ```
+   node -e "const { Pool } = require('pg'); const pool = new Pool({user: process.env.DB_USER || 'postgres', host: process.env.DB_HOST || 'localhost', database: process.env.DB_NAME || 'postgres', password: process.env.DB_PASSWORD || '12345678', port: parseInt(process.env.DB_PORT || '5432', 10)}); pool.query('SELECT NOW()', (err, res) => { console.log(err ? err : res.rows[0]); pool.end(); });"
+   ```
+
+3. Check Nginx configuration:
+   ```
+   sudo nginx -t
+   sudo systemctl status nginx
+   ```

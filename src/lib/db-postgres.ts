@@ -2,19 +2,10 @@ import { Pool } from 'pg';
 import { v4 as uuidv4 } from 'uuid';
 import { mockJobPostings, mockCandidates } from '@/data/mockData';
 import { Candidate, ExperienceEntry, EducationEntry } from '@/types';
+import { dbConfig } from './db-postgres-config';
 
 // Create a connection pool
-const pool = new Pool({
-  user: 'postgres',
-  host: 'localhost',
-  database: 'postgres',
-  password: '12345678',
-  port: 5432,
-  // Add connection timeout settings
-  connectionTimeoutMillis: 5000,
-  // Add optional query timeout
-  statement_timeout: 10000
-});
+const pool = new Pool(dbConfig);
 
 // Test database connection on startup
 (async () => {

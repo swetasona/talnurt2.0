@@ -3,9 +3,9 @@
 // Run uploads directory setup
 require('./src/utils/setupUploads');
 
-// Use port 3000 exclusively
-const port = 3000;
-const baseUrl = `http://localhost:${port}`;
+// Get environment variables with fallbacks
+const port = process.env.PORT || 3001;
+const baseUrl = process.env.BASE_URL || `http://localhost:${port}`;
 
 // Set default environment variables if not already set
 if (!process.env.NEXTAUTH_URL) {
@@ -39,6 +39,16 @@ const nextConfig = {
   // Basic image optimization
   images: {
     domains: ['localhost', 'via.placeholder.com', 'example.com', 'placehold.co'],
+    remotePatterns: [
+      {
+        protocol: 'http',
+        hostname: '**',
+      },
+      {
+        protocol: 'https',
+        hostname: '**',
+      },
+    ],
   },
   
   // Enable compression
@@ -71,16 +81,16 @@ const nextConfig = {
   
   // Set environment variables that will be available on both client and server side
   env: {
-    NEXTAUTH_URL: baseUrl,
-    BASE_URL: baseUrl,
-    API_URL: `${baseUrl}/api`,
+    NEXTAUTH_URL: process.env.NEXTAUTH_URL || baseUrl,
+    BASE_URL: process.env.BASE_URL || baseUrl,
+    API_URL: process.env.API_URL || `${baseUrl}/api`,
   },
   
   // Add publicRuntimeConfig for server-side usage
   publicRuntimeConfig: {
-    NEXTAUTH_URL: baseUrl,
-    BASE_URL: baseUrl,
-    API_URL: `${baseUrl}/api`,
+    NEXTAUTH_URL: process.env.NEXTAUTH_URL || baseUrl,
+    BASE_URL: process.env.BASE_URL || baseUrl,
+    API_URL: process.env.API_URL || `${baseUrl}/api`,
   },
 
   async redirects() {
