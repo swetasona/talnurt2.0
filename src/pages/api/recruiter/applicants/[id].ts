@@ -1,48 +1,50 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getServerSession } from 'next-auth';
-import { PrismaClient } from '@prisma/client';
+import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../../auth/[...nextauth]';
-import { v4 as uuidv4 } from 'uuid';
-import { executeQuery } from '@/lib/db';
+import { prisma } from '@/lib/prisma';
 
-const prisma = new PrismaClient();
+// Check if an applicant is already in the talent pool
+async function checkIfInTalentPool(recruiterId: string, applicantId: string): Promise<boolean> {
+  const savedCandidate = await prisma.saved_candidates.findFirst({
+    where: {
+      recruiter_id: recruiterId,
+      user_id: applicantId
+    }
+  });
+  
+  return !!savedCandidate;
+}
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  try {
-    // Get the session to verify the user is authenticated and is a recruiter
-    const session = await getServerSession(req, res, authOptions);
+  // Get the session to verify the user is authenticated
+  const session = await getServerSession(req, res, authOptions);
 
-    if (!session) {
-      return res.status(401).json({ error: 'Not authenticated' });
-    }
+  if (!session || !session.user?.id) {
+    return res.status(401).json({ error: 'Unauthorized. Please log in.' });
+  }
 
-    if (session.user.role !== 'recruiter') {
-      return res.status(403).json({ error: 'Not authorized. Only recruiters can access this endpoint.' });
-    }
+  // Check if user is a recruiter
+  if (session.user.role !== 'recruiter' && session.user.role !== 'employer') {
+    return res.status(403).json({ error: 'Access denied. Only recruiters can access this resource.' });
+  }
 
-    const recruiterId = session.user.id;
-    const applicantId = req.query.id as string;
+  const recruiterId = session.user.id;
+  const applicantId = req.query.id as string;
 
-    if (!applicantId) {
-      return res.status(400).json({ error: 'Applicant ID is required' });
-    }
+  if (!applicantId) {
+    return res.status(400).json({ error: 'Applicant ID is required' });
+  }
 
-    switch (req.method) {
-      case 'GET':
-        return getApplicant(req, res, recruiterId, applicantId);
-      case 'DELETE':
-        return deleteApplication(req, res, recruiterId, applicantId);
-      case 'POST':
-        if (req.query.action === 'save-to-talent') {
-          return saveToTalentPool(req, res, recruiterId, applicantId);
-        }
-        return res.status(400).json({ error: 'Invalid action' });
-      default:
-        return res.status(405).json({ error: 'Method not allowed' });
-    }
-  } catch (error) {
-    console.error('Error in applicant API:', error);
-    return res.status(500).json({ error: 'Internal server error' });
+  // Handle different HTTP methods
+  switch (req.method) {
+    case 'GET':
+      return getApplicant(req, res, recruiterId, applicantId);
+    case 'DELETE':
+      return deleteApplication(req, res, recruiterId, applicantId);
+    case 'POST':
+      return saveToTalentPool(req, res, recruiterId, applicantId);
+    default:
+      return res.status(405).json({ error: 'Method not allowed' });
   }
 }
 
@@ -51,7 +53,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
  */
 async function getApplicant(req: NextApiRequest, res: NextApiResponse, recruiterId: string, applicantId: string) {
   try {
-    // First verify this is an application for a job posted by this recruiter
+    // Verify this is an application for a job posted by this recruiter
     const application = await prisma.applications.findFirst({
       where: {
         user_id: applicantId,
@@ -60,15 +62,6 @@ async function getApplicant(req: NextApiRequest, res: NextApiResponse, recruiter
         },
       },
       include: {
-        job_postings: {
-          select: {
-            id: true,
-            title: true,
-            company: true,
-            location: true,
-            description: true,
-          },
-        },
         users: {
           select: {
             id: true,
@@ -78,13 +71,9 @@ async function getApplicant(req: NextApiRequest, res: NextApiResponse, recruiter
               select: {
                 resume_url: true,
                 phone_number: true,
-                linkedin_url: true,
-                github_url: true,
-                city: true,
-                state: true,
-                country: true,
-                preferred_role: true,
-                preferred_location: true,
+                linkedin: true, // Updated field name
+                github: true,   // Updated field name
+                location: true, // Use location field instead of city/state/country
               },
             },
             user_skills: {
@@ -115,6 +104,7 @@ async function getApplicant(req: NextApiRequest, res: NextApiResponse, recruiter
             }
           },
         },
+        job_postings: true, // Include job posting details
       },
     });
 
@@ -128,12 +118,8 @@ async function getApplicant(req: NextApiRequest, res: NextApiResponse, recruiter
     // Extract skills from user_skills
     const skills = application.users.user_skills.map(skill => skill.name);
     
-    // Format location from profile data
-    const locationParts = [];
-    if (application.users.user_profile?.city) locationParts.push(application.users.user_profile.city);
-    if (application.users.user_profile?.state) locationParts.push(application.users.user_profile.state);
-    if (application.users.user_profile?.country) locationParts.push(application.users.user_profile.country);
-    const location = locationParts.length > 0 ? locationParts.join(', ') : null;
+    // Use location directly from the profile
+    const location = application.users.user_profile?.location || null;
 
     // Format experience data
     const experience = application.users.user_experience.map(exp => ({
@@ -161,11 +147,11 @@ async function getApplicant(req: NextApiRequest, res: NextApiResponse, recruiter
       phone: application.users.user_profile?.phone_number || null,
       skills: skills,
       resumeUrl: application.users.user_profile?.resume_url || null,
-      githubUrl: application.users.user_profile?.github_url || null,
-      linkedinUrl: application.users.user_profile?.linkedin_url || null,
-      bio: application.users.user_profile?.preferred_role || null, // Using preferred_role as bio
+      githubUrl: application.users.user_profile?.github || null, // Updated field name
+      linkedinUrl: application.users.user_profile?.linkedin || null, // Updated field name
+      bio: null, // No direct equivalent in schema
       location: location,
-      website: null, // Not available in schema
+      website: application.users.user_profile?.website || null, // Use website field
       experience: experience,
       education: education,
       applicationDetails: {
@@ -249,8 +235,8 @@ async function saveToTalentPool(req: NextApiRequest, res: NextApiResponse, recru
               select: {
                 resume_url: true,
                 phone_number: true,
-                linkedin_url: true,
-                github_url: true,
+                linkedin: true, // Updated field name
+                github: true,   // Updated field name
               },
             },
             user_skills: {
@@ -267,85 +253,32 @@ async function saveToTalentPool(req: NextApiRequest, res: NextApiResponse, recru
       return res.status(404).json({ error: 'Applicant not found or not authorized' });
     }
 
-    // Check if the candidate is already in the talent pool
-    const isInTalentPool = await checkIfInTalentPool(recruiterId, applicantId);
-    
-    if (isInTalentPool) {
-      return res.status(200).json({ message: 'Candidate already in talent pool' });
+    // Check if already saved
+    const existingSave = await prisma.saved_candidates.findFirst({
+      where: {
+        recruiter_id: recruiterId,
+        user_id: applicantId,
+      },
+    });
+
+    if (existingSave) {
+      return res.status(409).json({ error: 'Applicant already saved to talent pool' });
     }
 
-    // Extract skills from user_skills
-    const skills = application.users.user_skills.map(skill => skill.name);
+    // Save to talent pool
+    await prisma.saved_candidates.create({
+      data: {
+        id: applicantId,
+        recruiter_id: recruiterId,
+        user_id: applicantId,
+        created_at: new Date(),
+        updated_at: new Date(),
+      },
+    });
 
-    // Prepare candidate data
-    const skillsJson = JSON.stringify(skills);
-
-    // Insert the candidate
-    await executeQuery(`
-      INSERT INTO candidates (
-        id, name, email, phone, skills, resume_url, github_url, linkedin_url,
-        source, created_at, updated_at
-      ) VALUES (
-        $1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW()
-      )
-      ON CONFLICT (id) DO UPDATE SET
-        name = EXCLUDED.name,
-        email = EXCLUDED.email,
-        phone = EXCLUDED.phone,
-        skills = EXCLUDED.skills,
-        resume_url = EXCLUDED.resume_url,
-        github_url = EXCLUDED.github_url,
-        linkedin_url = EXCLUDED.linkedin_url,
-        updated_at = NOW()
-    `, [
-      applicantId,
-      application.users.name,
-      application.users.email,
-      application.users.user_profile?.phone_number || null,
-      skillsJson,
-      application.users.user_profile?.resume_url || null,
-      application.users.user_profile?.github_url || null,
-      application.users.user_profile?.linkedin_url || null,
-      'application',
-    ]);
-
-    // Associate candidate with recruiter
-    const associationId = uuidv4();
-    await executeQuery(`
-      INSERT INTO recruiter_candidates (
-        id, recruiter_id, candidate_id, created_at, updated_at
-      ) VALUES (
-        $1, $2, $3, NOW(), NOW()
-      )
-      ON CONFLICT (recruiter_id, candidate_id) DO NOTHING
-    `, [
-      associationId,
-      recruiterId,
-      applicantId,
-    ]);
-
-    return res.status(200).json({ message: 'Candidate added to talent pool successfully' });
+    return res.status(200).json({ message: 'Applicant saved to talent pool' });
   } catch (error) {
-    console.error('Error adding candidate to talent pool:', error);
-    return res.status(500).json({ error: 'Failed to add candidate to talent pool' });
-  }
-}
-
-/**
- * Check if an applicant is already in the talent pool
- */
-async function checkIfInTalentPool(recruiterId: string, applicantId: string): Promise<boolean> {
-  try {
-    const result = await executeQuery(`
-      SELECT EXISTS (
-        SELECT 1 FROM recruiter_candidates
-        WHERE recruiter_id = $1 AND candidate_id = $2
-      )
-    `, [recruiterId, applicantId]);
-
-    return result[0].exists;
-  } catch (error) {
-    console.error('Error checking if candidate is in talent pool:', error);
-    return false;
+    console.error('Error saving to talent pool:', error);
+    return res.status(500).json({ error: 'Failed to save applicant to talent pool' });
   }
 } 

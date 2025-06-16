@@ -38,7 +38,7 @@ const nextConfig = {
   
   // Basic image optimization
   images: {
-    domains: ['localhost'],
+    domains: ['localhost', 'via.placeholder.com', 'example.com', 'placehold.co'],
   },
   
   // Enable compression
@@ -81,6 +81,17 @@ const nextConfig = {
     NEXTAUTH_URL: baseUrl,
     BASE_URL: baseUrl,
     API_URL: `${baseUrl}/api`,
+  },
+
+  async redirects() {
+    return [
+      // Redirect old route to new route
+      {
+        source: '/recruiter/employer/candidates/:id/status',
+        destination: '/recruiter/employer/profile-management/candidates/:id',
+        permanent: true,
+      },
+    ]
   },
 };
 

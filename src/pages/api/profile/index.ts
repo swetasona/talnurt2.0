@@ -1,11 +1,9 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
-import { PrismaClient } from '@prisma/client';
 import { authOptions } from '../auth/[...nextauth]';
+import { prisma } from '@/lib/prisma';
 
-const prisma = new PrismaClient();
-
-// Define types for data received from the client
+// Define interfaces for type safety
 interface EducationData {
   institution: string;
   degree: string;
@@ -27,7 +25,7 @@ interface SkillData {
 
 interface ContactInfoData {
   phoneNumber?: string;
-  countryCode?: string;
+  // Remove fields that don't exist in the schema
   city?: string;
   state?: string;
   country?: string;
@@ -36,6 +34,7 @@ interface ContactInfoData {
 }
 
 interface PreferencesData {
+  // Remove fields that don't exist in the schema
   preferredLocation?: string;
   preferredRole?: string;
   preferredType?: string;
@@ -45,18 +44,21 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  // Check if the user is authenticated using server-side session
+  // Get the session to verify authentication
   const session = await getServerSession(req, res, authOptions);
 
   if (!session || !session.user?.id) {
-    return res.status(401).json({ error: 'Unauthorized' });
+    return res.status(401).json({ error: 'Unauthorized. Please log in.' });
   }
 
+  const userId = session.user.id;
+
+  // Handle different HTTP methods
   switch (req.method) {
     case 'GET':
-      return getProfile(req, res, session.user.id);
+      return getProfile(req, res, userId);
     case 'POST':
-      return saveProfile(req, res, session.user.id);
+      return saveProfile(req, res, userId);
     default:
       return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -105,7 +107,6 @@ async function getProfile(
       twitter: userData.user_profile?.twitter || null,
       website: userData.user_profile?.website || null,
       portfolio: userData.user_profile?.portfolio || null,
-      // Remove fields that don't exist in the schema
     };
 
     // Format the data to match the UI expectations
@@ -131,17 +132,16 @@ async function getProfile(
       })),
       contactInfo: userData.user_profile ? {
         phoneNumber: userData.user_profile.phone_number,
-        countryCode: userData.user_profile.country_code,
-        city: userData.user_profile.city,
-        state: userData.user_profile.state,
-        country: userData.user_profile.country,
-        githubUrl: userData.user_profile.github_url,
-        linkedinUrl: userData.user_profile.linkedin_url
+        // Map existing fields from the schema
+        location: userData.user_profile.location,
+        github: userData.user_profile.github,
+        linkedin: userData.user_profile.linkedin
       } : {},
       preferences: userData.user_profile ? {
-        preferredLocation: userData.user_profile.preferred_location,
-        preferredRole: userData.user_profile.preferred_role,
-        preferredType: userData.user_profile.preferred_type
+        // Map to existing fields or use empty strings
+        jobTypePreference: userData.user_profile.job_type_preference,
+        location: userData.user_profile.location,
+        willingToRelocate: userData.user_profile.willing_to_relocate
       } : {},
       resume: userData.user_profile?.resume_url || null
     };
@@ -180,30 +180,28 @@ async function saveProfile(
         where: { user_id: userId },
         update: {
           phone_number: contactInfo?.phoneNumber,
-          country_code: contactInfo?.countryCode,
-          city: contactInfo?.city,
-          state: contactInfo?.state,
-          country: contactInfo?.country,
-          github_url: contactInfo?.githubUrl,
-          linkedin_url: contactInfo?.linkedinUrl,
-          preferred_location: preferences?.preferredLocation,
-          preferred_role: preferences?.preferredRole,
-          preferred_type: preferences?.preferredType,
+          // Use existing fields in the schema
+          location: contactInfo?.city ? 
+            `${contactInfo.city}${contactInfo.state ? ', ' + contactInfo.state : ''}${contactInfo.country ? ', ' + contactInfo.country : ''}` : 
+            undefined,
+          github: contactInfo?.githubUrl,
+          linkedin: contactInfo?.linkedinUrl,
+          job_type_preference: preferences?.preferredType,
+          willing_to_relocate: preferences?.preferredLocation ? false : true,
           resume_url: resumeUrl || undefined,
           updated_at: new Date()
         },
         create: {
           user_id: userId,
           phone_number: contactInfo?.phoneNumber,
-          country_code: contactInfo?.countryCode,
-          city: contactInfo?.city,
-          state: contactInfo?.state,
-          country: contactInfo?.country,
-          github_url: contactInfo?.githubUrl,
-          linkedin_url: contactInfo?.linkedinUrl,
-          preferred_location: preferences?.preferredLocation,
-          preferred_role: preferences?.preferredRole,
-          preferred_type: preferences?.preferredType,
+          // Use existing fields in the schema
+          location: contactInfo?.city ? 
+            `${contactInfo.city}${contactInfo.state ? ', ' + contactInfo.state : ''}${contactInfo.country ? ', ' + contactInfo.country : ''}` : 
+            undefined,
+          github: contactInfo?.githubUrl,
+          linkedin: contactInfo?.linkedinUrl,
+          job_type_preference: preferences?.preferredType,
+          willing_to_relocate: preferences?.preferredLocation ? false : true,
           resume_url: resumeUrl
         }
       });

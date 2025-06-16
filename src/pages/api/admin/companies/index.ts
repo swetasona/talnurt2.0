@@ -42,7 +42,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         logo_url,
         website_url,
         linkedin_url,
-        speciality 
+        speciality
       } = req.body;
 
       // Validate required fields
@@ -64,18 +64,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(409).json({ error: 'A company with this name already exists' });
       }
 
+      // Prepare description with LinkedIn and Speciality
+      let fullDescription = description || '';
+      if (linkedin_url) {
+        fullDescription += fullDescription ? `\nLinkedIn: ${linkedin_url}` : `LinkedIn: ${linkedin_url}`;
+      }
+      if (speciality) {
+        fullDescription += fullDescription ? `\nSpeciality: ${speciality}` : `Speciality: ${speciality}`;
+      }
+
       // Create the new company
       const newCompany = await prisma.companies.create({
         data: {
           id: uuidv4(),
           name,
-          description: description || '',
+          description: fullDescription,
           industry: industry || '',
           location: location || '',
           logo_url: logo_url || '',
           website: website_url || '',
-          linkedin_url: linkedin_url || '',
-          speciality: speciality || '',
           created_at: new Date(),
           updated_at: new Date(),
         },
