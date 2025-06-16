@@ -4,7 +4,7 @@
 require('./src/utils/setupUploads');
 
 // Get environment variables with fallbacks
-const port = process.env.PORT || 3001;
+const port = process.env.PORT || 3000;
 const baseUrl = process.env.BASE_URL || `http://localhost:${port}`;
 
 // Set default environment variables if not already set
