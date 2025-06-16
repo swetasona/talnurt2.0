@@ -1,0 +1,5 @@
+# This is the migration file format used by Prisma
+# Learn more about the format: https://pris.ly/d/migration-format
+
+migration_name = "20240526000000_add_hierarchy_structure"
+checksum = "9f47b48cb5fc329ede7db2acf9f6303db90ccd1a3fdf85b4f3c65ce5d37ef78f" 

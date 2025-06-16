@@ -1,0 +1,23 @@
+
+John Doe
+Email: john.doe@example.com
+Phone: 555-123-4567
+
+Summary
+-------
+Experienced software developer with 5 years of experience in web development.
+
+Experience
+----------
+Senior Developer
+ABC Company
+Jan 2020 - Present
+- Developed web applications using React and Node.js
+- Led a team of 3 junior developers
+
+Education
+---------
+Bachelor of Science in Computer Science
+XYZ University
+2015-2019
+  

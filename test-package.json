@@ -1,0 +1,10 @@
+{
+  "name": "skills-api-test",
+  "version": "1.0.0",
+  "description": "Test script for Skills API",
+  "main": "test-skills-api.js",
+  "type": "module",
+  "dependencies": {
+    "node-fetch": "^3.3.0"
+  }
+} 

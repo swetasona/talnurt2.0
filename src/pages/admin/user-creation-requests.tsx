@@ -1,0 +1,843 @@
+﻿import React, { useState, useEffect } from 'react';
+import Head from 'next/head';
+import AdminLayout from '@/components/Layout/AdminLayout';
+import { FaUser, FaBuilding, FaUserTie, FaCheck, FaTimes, FaSpinner, FaClock, FaExclamationTriangle, FaEye, FaEyeSlash, FaUserPlus, FaUserCog, FaSearch, FaFilter, FaCalendarAlt } from 'react-icons/fa';
+import toast from 'react-hot-toast';
+import { loadAllPasswordsFromDatabase } from '@/utils/passwordStorage';
+
+interface UserCreationRequest {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  status: string;
+  created_at: string;
+  password?: string;
+  showPassword?: boolean;
+  company: {
+    id: string;
+    name: string;
+  };
+  requester: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  manager?: {
+    id: string;
+    name: string;
+    email: string;
+  };
+}
+
+const UserCreationRequestsPage: React.FC = () => {
+  console.log("Component rendering with updates");
+  const [requests, setRequests] = useState<UserCreationRequest[]>([]);
+  const [filteredRequests, setFilteredRequests] = useState<UserCreationRequest[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [processingId, setProcessingId] = useState<string | null>(null);
+  const [showRejectionModal, setShowRejectionModal] = useState(false);
+  const [selectedRequest, setSelectedRequest] = useState<UserCreationRequest | null>(null);
+  const [generatedPassword, setGeneratedPassword] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  
+  // Search and filter states
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [dateFilter, setDateFilter] = useState('');
+  const [companyFilter, setCompanyFilter] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+
+  // Sorting state
+  const [sortField, setSortField] = useState<string>('created_at');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+
+  useEffect(() => {
+    fetchRequests();
+  }, []);
+
+  useEffect(() => {
+    applyFilters();
+  }, [requests, searchTerm, statusFilter, dateFilter, companyFilter]);
+
+  const fetchRequests = async () => {
+    setIsLoading(true);
+    try {
+      // Make sure passwords are loaded
+      await loadAllPasswordsFromDatabase();
+      
+      const response = await fetch('/api/admin/user-creation-requests');
+      if (response.ok) {
+        const data = await response.json();
+        console.log("API Response:", data); // Debug log to check the API response
+        console.log("Requests count:", data.requests?.length || 0);
+        console.log("First request:", data.requests?.[0]);
+        setRequests(data.requests || []);
+        setFilteredRequests(data.requests || []);
+      } else {
+        console.error("API Error:", await response.text()); // Debug log to check error response
+        toast.error('Failed to fetch requests');
+      }
+    } catch (error) {
+      console.error('Error fetching requests:', error);
+      toast.error('Error loading requests');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const applyFilters = () => {
+    let result = [...requests];
+    
+    // Apply search term filter
+    if (searchTerm) {
+      const lowerSearchTerm = searchTerm.toLowerCase();
+      result = result.filter(
+        req => 
+          req.name.toLowerCase().includes(lowerSearchTerm) ||
+          req.email.toLowerCase().includes(lowerSearchTerm) ||
+          req.company.name.toLowerCase().includes(lowerSearchTerm) ||
+          req.requester.name.toLowerCase().includes(lowerSearchTerm) ||
+          req.requester.email.toLowerCase().includes(lowerSearchTerm) ||
+          (req.manager && req.manager.name.toLowerCase().includes(lowerSearchTerm)) ||
+          (req.manager && req.manager.email.toLowerCase().includes(lowerSearchTerm))
+      );
+    }
+    
+    // Apply status filter
+    if (statusFilter !== 'all') {
+      result = result.filter(req => req.status === statusFilter);
+    }
+    
+    // Apply date filter
+    if (dateFilter) {
+      const filterDate = new Date(dateFilter);
+      filterDate.setHours(0, 0, 0, 0);
+      result = result.filter(req => {
+        const requestDate = new Date(req.created_at);
+        requestDate.setHours(0, 0, 0, 0);
+        return requestDate.getTime() === filterDate.getTime();
+      });
+    }
+    
+    // Apply company filter
+    if (companyFilter) {
+      result = result.filter(req => 
+        req.company.name.toLowerCase() === companyFilter.toLowerCase()
+      );
+    }
+    
+    setFilteredRequests(result);
+  };
+
+  const resetFilters = () => {
+    setSearchTerm('');
+    setStatusFilter('all');
+    setDateFilter('');
+    setCompanyFilter('');
+  };
+
+  // Get unique companies for filter dropdown
+  const uniqueCompanies = [...new Set(requests.map(req => req.company.name))];
+
+  const handleApprove = async (requestId: string) => {
+    setProcessingId(requestId);
+    try {
+      const response = await fetch('/api/admin/user-creation-requests', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          requestId,
+          status: 'approved'
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        toast.success(data.message);
+        
+        if (data.generatedPassword) {
+          // Don't set generatedPassword state or show popup
+          // Just update the request in the requests array with the generated password
+          setRequests(requests.map(req => 
+            req.id === requestId 
+              ? { 
+                  ...req, 
+                  status: 'approved',
+                  password: data.generatedPassword,
+                  showPassword: false 
+                } 
+              : req
+          ));
+        } else {
+          fetchRequests(); // Fallback to fetching all requests if no password was generated
+        }
+      } else {
+        const errorData = await response.json();
+        toast.error(errorData.error || 'Failed to approve request');
+      }
+    } catch (error) {
+      console.error('Error approving request:', error);
+      toast.error('Error approving request');
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleReject = async () => {
+    if (!selectedRequest) return;
+
+    setProcessingId(selectedRequest.id);
+    try {
+      const response = await fetch('/api/admin/user-creation-requests', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          requestId: selectedRequest.id,
+          status: 'rejected'
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        toast.success(data.message);
+        setShowRejectionModal(false);
+        setSelectedRequest(null);
+        fetchRequests();
+      } else {
+        const errorData = await response.json();
+        toast.error(errorData.error || 'Failed to reject request');
+      }
+    } catch (error) {
+      console.error('Error rejecting request:', error);
+      toast.error('Error rejecting request');
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const openRejectionModal = (request: UserCreationRequest) => {
+    setSelectedRequest(request);
+    setShowRejectionModal(true);
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return <FaClock className="text-yellow-500" />;
+      case 'approved':
+        return <FaCheck className="text-green-500" />;
+      case 'rejected':
+        return <FaExclamationTriangle className="text-red-500" />;
+      default:
+        return <FaClock className="text-gray-500" />;
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'approved':
+        return 'bg-green-100 text-green-800';
+      case 'rejected':
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success('Password copied to clipboard!');
+  };
+
+  const togglePasswordVisibility = (requestId: string) => {
+    setRequests(requests.map(req => 
+      req.id === requestId 
+        ? { ...req, showPassword: !req.showPassword } 
+        : req
+    ));
+  };
+
+  // Calculate stats for the dashboard - only show pending requests in stats
+  const pendingRequests = requests.filter(req => req.status === 'pending');
+  const processedRequests = requests.filter(req => req.status !== 'pending');
+  
+  const statsData = {
+    total: pendingRequests.length,
+    pending: pendingRequests.length
+  };
+  
+  // Function to handle sorting
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('desc');
+    }
+  };
+
+  // Apply sorting to filtered requests
+  const sortedRequests = [...filteredRequests].sort((a, b) => {
+    let valA, valB;
+
+    switch (sortField) {
+      case 'name':
+        valA = a.name.toLowerCase();
+        valB = b.name.toLowerCase();
+        break;
+      case 'company':
+        valA = a.company.name.toLowerCase();
+        valB = b.company.name.toLowerCase();
+        break;
+      case 'requester':
+        valA = a.requester.name.toLowerCase();
+        valB = b.requester.name.toLowerCase();
+        break;
+      case 'status':
+        valA = a.status;
+        valB = b.status;
+        break;
+      case 'created_at':
+      default:
+        valA = new Date(a.created_at).getTime();
+        valB = new Date(b.created_at).getTime();
+        break;
+    }
+
+    if (sortDirection === 'asc') {
+      return valA > valB ? 1 : valA < valB ? -1 : 0;
+    } else {
+      return valA < valB ? 1 : valA > valB ? -1 : 0;
+    }
+  });
+
+  // Separate pending and processed requests
+  const pendingFilteredRequests = sortedRequests.filter(req => req.status === 'pending');
+  const processedFilteredRequests = sortedRequests.filter(req => req.status !== 'pending');
+
+  if (isLoading) {
+    return (
+      <AdminLayout>
+        <Head>
+          <title>User Creation Requests | Talnurt Recruitment Portal</title>
+        </Head>
+        <div className="flex items-center justify-center py-12">
+          <FaSpinner className="animate-spin text-blue-500 text-3xl mr-4" />
+          <span className="text-xl text-gray-600">Loading user creation requests...</span>
+        </div>
+      </AdminLayout>
+    );
+  }
+
+  return (
+    <AdminLayout>
+      <Head>
+        <title>User Creation Requests | Talnurt Recruitment Portal</title>
+      </Head>
+
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg shadow-lg p-6 text-white">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <div className="h-12 w-12 bg-white/20 rounded-full flex items-center justify-center mr-4">
+                <FaUserPlus className="h-6 w-6" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold">User Creation Requests</h1>
+                <p className="text-blue-100 mt-1">
+                  Review and manage user account creation requests from employers
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Search and Filter Bar */}
+        <div className="bg-white rounded-lg shadow p-4">
+          <div className="flex flex-col md:flex-row md:items-center gap-4">
+            <div className="flex-1">
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                  <FaSearch className="text-gray-400" />
+                </div>
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Search by name, email, or company..."
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className="flex items-center px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 transition-colors"
+              >
+                <FaFilter className="mr-2" />
+                <span>Filters</span>
+                <span className="ml-2 h-5 w-5 flex items-center justify-center text-xs bg-blue-500 text-white rounded-full">
+                  {(statusFilter !== 'all' ? 1 : 0) + (dateFilter ? 1 : 0) + (companyFilter ? 1 : 0)}
+                </span>
+              </button>
+              {(statusFilter !== 'all' || dateFilter || companyFilter) && (
+                <button
+                  onClick={resetFilters}
+                  className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-sm transition-colors"
+                >
+                  Clear Filters
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Expandable Filters */}
+          {showFilters && (
+            <div className="mt-4 border-t pt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="all">All Statuses</option>
+                  <option value="pending">Pending</option>
+                  <option value="approved">Approved</option>
+                  <option value="rejected">Rejected</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                    <FaCalendarAlt className="text-gray-400" />
+                  </div>
+                  <input
+                    type="date"
+                    value={dateFilter}
+                    onChange={(e) => setDateFilter(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Company</label>
+                <select
+                  value={companyFilter}
+                  onChange={(e) => setCompanyFilter(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">All Companies</option>
+                  {uniqueCompanies.map((company, index) => (
+                    <option key={index} value={company}>
+                      {company}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Pending Requests Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <div className="bg-white rounded-lg shadow p-4 border-l-4 border-blue-500">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500">Pending Requests</p>
+                <h3 className="text-2xl font-bold text-gray-800">{statsData.total}</h3>
+              </div>
+              <FaClock className="text-blue-400 text-2xl" />
+            </div>
+          </div>
+          <div className="flex items-center justify-center bg-white rounded-lg shadow p-4">
+            <p className="text-sm text-gray-500 italic">
+              {statsData.total === 0 
+                ? "No pending requests to review" 
+                : `You have ${statsData.total} pending request${statsData.total !== 1 ? 's' : ''} to review`}
+            </p>
+          </div>
+        </div>
+
+        {/* Pending Requests List */}
+        <div className="bg-white rounded-lg shadow-md overflow-hidden">
+          <div className="p-4 bg-gray-50 border-b border-gray-200">
+            <h3 className="text-lg font-medium text-gray-800 flex items-center">
+              <FaUserCog className="mr-2" /> Pending Requests
+            </h3>
+          </div>
+          {pendingFilteredRequests.length === 0 ? (
+            <div className="text-center py-12 bg-white">
+              <FaClock className="mx-auto text-4xl text-gray-300 mb-3" />
+              <h3 className="text-md font-medium text-gray-600 mb-2">No Pending Requests</h3>
+              <p className="text-gray-500 max-w-md mx-auto text-sm">
+                {requests.filter(r => r.status === 'pending').length > 0 
+                  ? 'No pending requests match your current filter criteria. Try adjusting your filters.'
+                  : 'There are no pending user creation requests at this time.'}
+              </p>
+              {requests.filter(r => r.status === 'pending').length > 0 && (
+                <button 
+                  onClick={resetFilters}
+                  className="mt-3 px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white text-sm rounded-lg transition-colors"
+                >
+                  Reset Filters
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="overflow-x-auto max-w-full">
+              <table className="w-full table-fixed">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[20%] cursor-pointer" 
+                        onClick={() => handleSort('name')}>
+                      <div className="flex items-center">
+                        User Details
+                        {sortField === 'name' && (
+                          <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                        )}
+                      </div>
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[10%] cursor-pointer"
+                        onClick={() => handleSort('company')}>
+                      <div className="flex items-center">
+                        Company
+                        {sortField === 'company' && (
+                          <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                        )}
+                      </div>
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[10%] cursor-pointer"
+                        onClick={() => handleSort('requester')}>
+                      <div className="flex items-center">
+                        Requested By
+                        {sortField === 'requester' && (
+                          <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                        )}
+                      </div>
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[10%] cursor-pointer"
+                        onClick={() => handleSort('created_at')}>
+                      <div className="flex items-center">
+                        Date
+                        {sortField === 'created_at' && (
+                          <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                        )}
+                      </div>
+                    </th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[10%]">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {pendingFilteredRequests.map((request) => (
+                    <tr key={request.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-4">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0 h-10 w-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500">
+                            {request.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="ml-4 truncate">
+                            <div className="text-sm font-medium text-gray-900 truncate">{request.name}</div>
+                            <div className="text-sm text-gray-500 truncate">{request.email}</div>
+                            <div className="text-xs text-gray-400 capitalize truncate">{request.role}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="flex items-center">
+                          <FaBuilding className="flex-shrink-0 mr-2 text-gray-400" />
+                          <div className="text-sm text-gray-900 truncate">{request.company.name}</div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4">
+                        <div>
+                          <div className="text-sm text-gray-900 truncate">{request.requester.name}</div>
+                          <div className="text-sm text-gray-500 truncate">{request.requester.email}</div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="text-sm text-gray-900">
+                          {new Date(request.created_at).toLocaleDateString()}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {new Date(request.created_at).toLocaleTimeString()}
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 text-center">
+                        <div className="flex items-center justify-center space-x-2">
+                          <button
+                            onClick={() => handleApprove(request.id)}
+                            disabled={processingId === request.id}
+                            className="p-1.5 bg-green-100 text-green-600 rounded-md hover:bg-green-200 transition-colors"
+                            title="Approve"
+                          >
+                            {processingId === request.id ? (
+                              <FaSpinner className="animate-spin h-4 w-4" />
+                            ) : (
+                              <FaCheck className="h-4 w-4" />
+                            )}
+                          </button>
+                          <button
+                            onClick={() => openRejectionModal(request)}
+                            disabled={processingId === request.id}
+                            className="p-1.5 bg-red-100 text-red-600 rounded-md hover:bg-red-200 transition-colors"
+                            title="Reject"
+                          >
+                            <FaTimes className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Processed Requests List */}
+        <div className="bg-white rounded-lg shadow-md overflow-hidden">
+          <div className="p-4 bg-gray-50 border-b border-gray-200">
+            <h3 className="text-lg font-medium text-gray-800 flex items-center">
+              <FaUserCog className="mr-2" /> Processed Requests
+            </h3>
+          </div>
+          {processedFilteredRequests.length === 0 ? (
+            <div className="text-center py-12 bg-white">
+              <FaUserPlus className="mx-auto text-4xl text-gray-300 mb-3" />
+              <h3 className="text-md font-medium text-gray-600 mb-2">No Processed Requests</h3>
+              <p className="text-gray-500 max-w-md mx-auto text-sm">
+                {requests.filter(r => r.status !== 'pending').length > 0 
+                  ? 'No processed requests match your current filter criteria. Try adjusting your filters.'
+                  : 'No requests have been processed yet. They will appear here once approved or rejected.'}
+              </p>
+              {requests.filter(r => r.status !== 'pending').length > 0 && (
+                <button 
+                  onClick={resetFilters}
+                  className="mt-3 px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white text-sm rounded-lg transition-colors"
+                >
+                  Reset Filters
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="overflow-x-auto max-w-full">
+              <table className="w-full table-fixed">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[20%] cursor-pointer" 
+                        onClick={() => handleSort('name')}>
+                      <div className="flex items-center">
+                        User Details
+                        {sortField === 'name' && (
+                          <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                        )}
+                      </div>
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[10%] cursor-pointer"
+                        onClick={() => handleSort('company')}>
+                      <div className="flex items-center">
+                        Company
+                        {sortField === 'company' && (
+                          <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                        )}
+                      </div>
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[10%] cursor-pointer"
+                        onClick={() => handleSort('requester')}>
+                      <div className="flex items-center">
+                        Requested By
+                        {sortField === 'requester' && (
+                          <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                        )}
+                      </div>
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[15%] cursor-pointer"
+                        onClick={() => handleSort('status')}>
+                      <div className="flex items-center">
+                        Status
+                        {sortField === 'status' && (
+                          <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                        )}
+                      </div>
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[10%] cursor-pointer"
+                        onClick={() => handleSort('created_at')}>
+                      <div className="flex items-center">
+                        Date
+                        {sortField === 'created_at' && (
+                          <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                        )}
+                      </div>
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[15%]">
+                      Password
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[10%]">
+                      Manager
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {processedFilteredRequests.map((request) => (
+                    <tr key={request.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-4">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0 h-10 w-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500">
+                            {request.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="ml-4 truncate">
+                            <div className="text-sm font-medium text-gray-900 truncate">{request.name}</div>
+                            <div className="text-sm text-gray-500 truncate">{request.email}</div>
+                            <div className="text-xs text-gray-400 capitalize truncate">{request.role}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="flex items-center">
+                          <FaBuilding className="flex-shrink-0 mr-2 text-gray-400" />
+                          <div className="text-sm text-gray-900 truncate">{request.company.name}</div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4">
+                        <div>
+                          <div className="text-sm text-gray-900 truncate">{request.requester.name}</div>
+                          <div className="text-sm text-gray-500 truncate">{request.requester.email}</div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="flex items-center">
+                          {getStatusIcon(request.status)}
+                          <span className={`ml-2 px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(request.status)}`}>
+                            {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="text-sm text-gray-500">
+                          {new Date(request.created_at).toLocaleDateString()}
+                        </div>
+                      </td>
+                      <td className="px-4 py-4">
+                        {request.status === 'approved' && request.password ? (
+                          <div className="bg-gray-50 p-2 rounded-lg">
+                            <div className="flex items-center justify-between">
+                              <span className="font-mono text-sm truncate max-w-[80px]" title={request.showPassword ? request.password : '(Hidden)'}>
+                                {request.showPassword ? request.password : '••••••••'}
+                              </span>
+                              <div className="flex space-x-2 flex-shrink-0">
+                                <button
+                                  onClick={() => togglePasswordVisibility(request.id)}
+                                  className="text-gray-500 hover:text-gray-700 text-xs"
+                                >
+                                  {request.showPassword ? <FaEyeSlash /> : <FaEye />}
+                                </button>
+                                <button
+                                  onClick={() => copyToClipboard(request.password || '')}
+                                  className="text-blue-500 hover:text-blue-700 text-xs"
+                                >
+                                  Copy
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-400">
+                            Not available
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-4">
+                        {request.manager ? (
+                          <div className="text-sm text-gray-600 truncate">{request.manager.name}</div>
+                        ) : (
+                          <span className="text-sm text-gray-400">None</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Rejection Modal */}
+        {showRejectionModal && selectedRequest && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4 shadow-xl">
+              <div className="flex items-center mb-4">
+                <div className="h-10 w-10 rounded-full bg-red-100 flex items-center justify-center mr-3 text-red-600">
+                  <FaTimes size={18} />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-800">
+                  Reject Request
+                </h3>
+              </div>
+
+              <div className="mb-4 bg-gray-50 p-4 rounded-lg">
+                <div className="flex items-center mb-2">
+                  <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center mr-2 text-gray-600">
+                    {selectedRequest.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <div className="font-medium">{selectedRequest.name}</div>
+                    <div className="text-sm text-gray-500">{selectedRequest.email}</div>
+                  </div>
+                </div>
+                <div className="text-sm text-gray-600 mt-2">
+                  <span className="font-medium">Company:</span> {selectedRequest.company.name}
+                </div>
+                <div className="text-sm text-gray-600 mt-1">
+                  <span className="font-medium">Requested by:</span> {selectedRequest.requester.name}
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <p className="text-sm text-gray-600">
+                  Are you sure you want to reject this user creation request?
+                </p>
+
+                <div className="flex space-x-3">
+                  <button
+                    onClick={handleReject}
+                    disabled={processingId === selectedRequest.id}
+                    className="flex-1 bg-red-500 hover:bg-red-600 disabled:bg-red-300 text-white py-2 px-4 rounded-lg flex items-center justify-center transition-colors"
+                  >
+                    {processingId === selectedRequest.id ? (
+                      <>
+                        <FaSpinner className="animate-spin mr-2" />
+                        Rejecting...
+                      </>
+                    ) : (
+                      'Reject Request'
+                    )}
+                  </button>
+                  <button
+                    onClick={() => setShowRejectionModal(false)}
+                    className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </AdminLayout>
+  );
+};
+
+export default UserCreationRequestsPage; 

@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS job_assignees (id VARCHAR(36) PRIMARY KEY, job_id VARCHAR(36) NOT NULL, user_id VARCHAR(36) NOT NULL, assigned_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT job_assignees_job_id_user_id_key UNIQUE (job_id, user_id), FOREIGN KEY (job_id) REFERENCES job_postings(id) ON DELETE CASCADE, FOREIGN KEY (user_id) REFERENCES users(id));

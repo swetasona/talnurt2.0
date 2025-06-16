@@ -1,0 +1,65 @@
+import { NextApiRequest, NextApiResponse } from 'next';
+import { Pool } from 'pg';
+
+// Create a connection pool
+const pool = new Pool({
+  user: 'postgres',
+  host: 'localhost',
+  database: 'postgres',
+  password: '12345678',
+  port: 5432,
+});
+
+// Wrap query execution in a helper function
+const executeQuery = async (query: string, params?: any[]) => {
+  try {
+    const client = await pool.connect();
+    try {
+      const result = await client.query(query, params);
+      return result.rows;
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Database query error:', error);
+    throw error;
+  }
+};
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  const { id } = req.query;
+  
+  if (req.method !== 'PATCH') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  try {
+    const { status } = req.body;
+
+    // Validate status
+    const validStatuses = ['pending', 'reviewed', 'interviewed', 'offered', 'rejected'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ 
+        error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` 
+      });
+    }
+
+    // Update the application status
+    const result = await executeQuery(
+      'UPDATE job_applications SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
+      [status, id]
+    );
+
+    if (!result || result.length === 0) {
+      return res.status(404).json({ error: 'Application not found' });
+    }
+
+    return res.status(200).json(result[0]);
+  } catch (error: any) {
+    console.error('Error updating application status:', error);
+    return res.status(500).json({ error: error.message || 'Failed to update application status' });
+  }
+} 

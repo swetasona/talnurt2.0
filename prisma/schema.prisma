@@ -1,0 +1,488 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                        String                      @id @default(cuid()) @db.VarChar(36)
+  name                      String                      @db.VarChar(255)
+  email                     String                      @unique @db.VarChar(255)
+  password                  String?                     @db.VarChar(255)
+  role                      String                      @default("user") @db.VarChar(50)
+  created_at                DateTime                    @default(now()) @db.Timestamp(6)
+  updated_at                DateTime                    @default(now()) @db.Timestamp(6)
+  team_id                   String?                     @db.VarChar(36)
+  is_active                 Boolean                     @default(true)
+  deactivated_at            DateTime?
+  email_verified            DateTime?                   @db.Timestamp(6)
+  image                     String?                     @db.VarChar(255)
+  avatar                    String?                     @db.VarChar(255)
+  department                String?                     @db.VarChar(255)
+  company_id                String?                     @db.VarChar(36)
+  manager_id                String?                     @db.VarChar(36)
+  company                   String?                     @db.VarChar(255)
+  applications              applications[]
+  deletionRequests          EmployeeDeletionRequests[]  @relation("EmployeeDeletionTarget")
+  requestedDeletions        EmployeeDeletionRequests[]  @relation("EmployeeDeletionRequester")
+  employerApplications      employer_applications[]
+  job_postings              job_postings[]
+  notifications             Notification[]              @relation("UserNotifications")
+  profileAllocations        ProfileAllocationEmployee[] @relation("ProfileAllocationEmployee")
+  createdProfileAllocations ProfileAllocation[]         @relation("ProfileAllocationCreator")
+  submittedCandidates       recruiter_candidates[]
+  sentReports               Report[]                    @relation("ReportAuthor")
+  receivedReports           Report[]                    @relation("ReportRecipient")
+  saved_candidates          saved_candidates[]
+  managedTeams              teams[]                     @relation("TeamManager")
+  managedUserRequests       user_creation_requests[]    @relation("UserCreationRequestManager")
+  userCreationRequests      user_creation_requests[]    @relation("UserCreationRequestRequester")
+  user_education            user_education[]
+  user_experience           user_experience[]
+  user_profile              user_profiles?
+  user_skills               user_skills[]
+  companyRelation           companies?                  @relation("UserCompany", fields: [company_id], references: [id])
+  manager                   User?                       @relation("UserManager", fields: [manager_id], references: [id])
+  subordinates              User[]                      @relation("UserManager")
+  team                      teams?                      @relation("TeamMembers", fields: [team_id], references: [id])
+
+  @@map("users")
+}
+
+model user_profiles {
+  id                  String   @id @default(cuid()) @db.VarChar(36)
+  user_id             String   @unique @db.VarChar(36)
+  phone_number        String?  @db.VarChar(50)
+  resume_url          String?  @db.VarChar(255)
+  created_at          DateTime @default(now()) @db.Timestamp(6)
+  updated_at          DateTime @default(now()) @db.Timestamp(6)
+  availability        String?  @db.VarChar(50)
+  avatar_url          String?  @db.VarChar(255)
+  company_id          String?  @db.VarChar(36)
+  github              String?  @db.VarChar(255)
+  headline            String?  @db.VarChar(255)
+  job_type_preference String?  @db.VarChar(100)
+  linkedin            String?  @db.VarChar(255)
+  location            String?  @db.VarChar(255)
+  portfolio           String?  @db.VarChar(255)
+  salary_expectation  String?  @db.VarChar(100)
+  summary             String?
+  twitter             String?  @db.VarChar(255)
+  website             String?  @db.VarChar(255)
+  willing_to_relocate Boolean? @default(false)
+  years_of_experience Int?
+  user                User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("user_profiles")
+}
+
+model user_education {
+  id          String   @id @default(cuid()) @db.VarChar(36)
+  user_id     String   @db.VarChar(36)
+  institution String   @db.VarChar(255)
+  degree      String   @db.VarChar(255)
+  year        String?  @db.VarChar(50)
+  field       String?  @db.VarChar(255)
+  created_at  DateTime @default(now()) @db.Timestamp(6)
+  updated_at  DateTime @default(now()) @db.Timestamp(6)
+  user        User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("user_education")
+}
+
+model user_experience {
+  id                String   @id @default(cuid()) @db.VarChar(36)
+  user_id           String   @db.VarChar(36)
+  company           String   @db.VarChar(255)
+  title             String   @db.VarChar(255)
+  start_date        String   @db.VarChar(50)
+  end_date          String?  @db.VarChar(50)
+  currently_working Boolean  @default(false)
+  description       String?
+  created_at        DateTime @default(now()) @db.Timestamp(6)
+  updated_at        DateTime @default(now()) @db.Timestamp(6)
+  user              User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("user_experience")
+}
+
+model user_skills {
+  id         String   @id @default(cuid()) @db.VarChar(36)
+  user_id    String   @db.VarChar(36)
+  name       String   @db.VarChar(100)
+  level      String?  @db.VarChar(50)
+  created_at DateTime @default(now()) @db.Timestamp(6)
+  updated_at DateTime @default(now()) @db.Timestamp(6)
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("user_skills")
+}
+
+model ContactSubmission {
+  id          String   @id @default(cuid())
+  name        String
+  email       String
+  subject     String
+  message     String
+  status      String   @default("PENDING")
+  submittedAt DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  phoneNumber String?
+
+  @@map("contact_submissions")
+}
+
+model applications {
+  id           String       @id @db.VarChar(36)
+  user_id      String       @db.VarChar(36)
+  job_id       String       @db.VarChar(36)
+  status       String       @default("pending") @db.VarChar(50)
+  applied_on   DateTime     @default(now()) @db.Timestamp(6)
+  created_at   DateTime     @default(now()) @db.Timestamp(6)
+  updated_at   DateTime     @default(now()) @db.Timestamp(6)
+  job_postings job_postings @relation(fields: [job_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users        User         @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model blogs {
+  id         String   @id @db.VarChar(36)
+  title      String   @db.VarChar(255)
+  content    String
+  category   String   @db.VarChar(100)
+  image_path String?  @db.VarChar(255)
+  created_at DateTime @db.Timestamp(6)
+  updated_at DateTime @db.Timestamp(6)
+}
+
+model candidates {
+  id                   String                 @id @db.VarChar(36)
+  name                 String                 @db.VarChar(255)
+  email                String                 @db.VarChar(255)
+  phone                String?                @db.VarChar(50)
+  skills               Json?
+  resume_url           String?                @db.VarChar(255)
+  relevancy_score      Int?
+  created_at           DateTime               @db.Timestamp(6)
+  updated_at           DateTime               @db.Timestamp(6)
+  source               String                 @default("manual") @db.VarChar(50)
+  user_id              String?                @db.VarChar(36)
+  github_url           String?                @db.VarChar(255)
+  linkedin_url         String?                @db.VarChar(255)
+  education            education[]
+  experience           experience[]
+  recruiterSubmissions recruiter_candidates[]
+
+  @@index([email])
+  @@index([user_id])
+}
+
+model education {
+  id           String     @id @db.VarChar(36)
+  candidate_id String     @db.VarChar(36)
+  institution  String     @db.VarChar(255)
+  degree       String     @db.VarChar(255)
+  field        String?    @db.VarChar(255)
+  start_date   DateTime?  @db.Timestamp(6)
+  end_date     DateTime?  @db.Timestamp(6)
+  created_at   DateTime   @db.Timestamp(6)
+  updated_at   DateTime   @db.Timestamp(6)
+  candidates   candidates @relation(fields: [candidate_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model experience {
+  id           String     @id @db.VarChar(36)
+  candidate_id String     @db.VarChar(36)
+  company      String     @db.VarChar(255)
+  title        String     @db.VarChar(255)
+  start_date   DateTime?  @db.Timestamp(6)
+  end_date     DateTime?  @db.Timestamp(6)
+  description  String?
+  created_at   DateTime   @db.Timestamp(6)
+  updated_at   DateTime   @db.Timestamp(6)
+  candidates   candidates @relation(fields: [candidate_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model job_applications {
+  id           String       @id @db.VarChar(36)
+  job_id       String       @db.VarChar(36)
+  name         String       @db.VarChar(255)
+  email        String       @db.VarChar(255)
+  phone        String?      @db.VarChar(255)
+  resume_url   String       @db.VarChar(255)
+  status       String       @db.VarChar(50)
+  applied_date DateTime     @db.Timestamp(6)
+  created_at   DateTime     @db.Timestamp(6)
+  updated_at   DateTime     @db.Timestamp(6)
+  job_postings job_postings @relation(fields: [job_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model job_postings {
+  id                String             @id @db.VarChar(36)
+  title             String             @db.VarChar(255)
+  description       String
+  requirements      Json
+  location          String             @db.VarChar(255)
+  salary            String?            @db.VarChar(255)
+  company           String?            @db.VarChar(255)
+  department        String?            @db.VarChar(255)
+  job_type          String?            @default("full-time") @db.VarChar(50)
+  work_mode         String?            @default("on-site") @db.VarChar(50)
+  experience        String?            @db.VarChar(255)
+  industry          String?            @db.VarChar(255)
+  currency          String?            @default("USD") @db.VarChar(10)
+  benefits          String?
+  summary           String?
+  responsibilities  String?
+  skills            Json?
+  deadline          DateTime?          @db.Timestamp(6)
+  application_email String?            @db.VarChar(255)
+  application_url   String?            @db.VarChar(255)
+  contact_person    String?            @db.VarChar(255)
+  status            String?            @default("open") @db.VarChar(50)
+  is_internal_only  Boolean?           @default(false)
+  is_featured       Boolean?           @default(false)
+  posted_date       DateTime           @db.Timestamp(6)
+  posted_by         String             @db.VarChar(36)
+  created_at        DateTime           @db.Timestamp(6)
+  updated_at        DateTime           @db.Timestamp(6)
+  posted_by_role    String             @default("admin") @db.VarChar(50)
+  applications      applications[]
+  job_applications  job_applications[]
+  job_assignees     job_assignees[]
+  user              User               @relation(fields: [posted_by], references: [id])
+
+  @@map("job_postings")
+}
+
+model saved_candidates {
+  id           String   @id @default(cuid()) @db.VarChar(36)
+  recruiter_id String   @db.VarChar(36)
+  candidate_id String   @db.VarChar(36)
+  job_id       String?  @db.VarChar(36)
+  notes        String?
+  created_at   DateTime @default(now()) @db.Timestamp(6)
+  updated_at   DateTime @default(now()) @db.Timestamp(6)
+  tags         Json?
+  recruiter    User     @relation(fields: [recruiter_id], references: [id], onDelete: Cascade)
+
+  @@unique([recruiter_id, candidate_id])
+  @@index([recruiter_id])
+  @@index([candidate_id])
+  @@map("saved_candidates")
+}
+
+model skills {
+  id          String   @id @default(cuid()) @db.VarChar(36)
+  name        String   @unique @db.VarChar(100)
+  description String?
+  created_at  DateTime @default(now()) @db.Timestamp(6)
+  updated_at  DateTime @default(now()) @db.Timestamp(6)
+
+  @@map("skills")
+}
+
+model industries {
+  id         String   @id @default(cuid()) @db.VarChar(36)
+  name       String   @db.VarChar(255)
+  created_at DateTime @default(now()) @db.Timestamp(6)
+  updated_at DateTime @default(now()) @db.Timestamp(6)
+
+  @@map("industries")
+}
+
+model companies {
+  id                   String                     @id @default(cuid()) @db.VarChar(36)
+  name                 String                     @db.VarChar(255)
+  logo_url             String?                    @db.VarChar(255)
+  website              String?                    @db.VarChar(255)
+  created_at           DateTime                   @default(now()) @db.Timestamp(6)
+  updated_at           DateTime                   @default(now()) @updatedAt @db.Timestamp(6)
+  employees_count      Int?
+  description          String?
+  location             String?                    @db.VarChar(255)
+  founded_year         Int?
+  industry             String?                    @db.VarChar(255)
+  size                 String?                    @db.VarChar(100)
+  deletionRequests     EmployeeDeletionRequests[] @relation("CompanyDeletionRequests")
+  teams                teams[]                    @relation("CompanyTeams")
+  userCreationRequests user_creation_requests[]   @relation("UserCreationRequestCompany")
+  users                User[]                     @relation("UserCompany")
+
+  @@map("companies")
+}
+
+model Report {
+  id          String   @id @default(cuid())
+  title       String   @db.VarChar(255)
+  content     String
+  status      String   @default("Unread") @db.VarChar(50)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  authorId    String   @db.VarChar(36)
+  recipientId String   @db.VarChar(36)
+  author      User     @relation("ReportAuthor", fields: [authorId], references: [id])
+  recipient   User     @relation("ReportRecipient", fields: [recipientId], references: [id])
+
+  @@index([authorId])
+  @@index([recipientId])
+  @@map("reports")
+}
+
+model teams {
+  id          String    @id @default(cuid()) @db.VarChar(36)
+  name        String    @db.VarChar(255)
+  company_id  String    @db.VarChar(36)
+  manager_id  String?   @db.VarChar(36)
+  created_at  DateTime  @default(now()) @db.Timestamp(6)
+  updated_at  DateTime  @default(now()) @updatedAt @db.Timestamp(6)
+  description String?
+  company     companies @relation("CompanyTeams", fields: [company_id], references: [id])
+  manager     User?     @relation("TeamManager", fields: [manager_id], references: [id])
+  members     User[]    @relation("TeamMembers")
+
+  @@index([manager_id])
+  @@index([company_id])
+  @@map("teams")
+}
+
+model employer_applications {
+  id           String   @id @default(cuid()) @db.VarChar(36)
+  recruiter_id String?  @db.VarChar(36)
+  status       String   @default("pending") @db.VarChar(50)
+  admin_notes  String?
+  created_at   DateTime @default(now()) @db.Timestamp(6)
+  updated_at   DateTime @default(now()) @db.Timestamp(6)
+  recruiter    User?    @relation(fields: [recruiter_id], references: [id])
+
+  @@index([recruiter_id])
+  @@map("employer_applications")
+}
+
+model user_creation_requests {
+  id           String    @id @default(cuid()) @db.VarChar(36)
+  name         String    @db.VarChar(255)
+  email        String    @db.VarChar(255)
+  role         String    @db.VarChar(50)
+  company_id   String    @db.VarChar(36)
+  requested_by String    @db.VarChar(36)
+  manager_id   String?   @db.VarChar(36)
+  status       String    @default("pending") @db.VarChar(50)
+  created_at   DateTime  @default(now()) @db.Timestamp(6)
+  updated_at   DateTime  @default(now()) @db.Timestamp(6)
+  metadata     String?
+  company      companies @relation("UserCreationRequestCompany", fields: [company_id], references: [id])
+  manager      User?     @relation("UserCreationRequestManager", fields: [manager_id], references: [id])
+  requester    User      @relation("UserCreationRequestRequester", fields: [requested_by], references: [id])
+
+  @@map("user_creation_requests")
+}
+
+model EmployeeDeletionRequests {
+  id                String    @id @default(cuid()) @db.VarChar(36)
+  employee_id       String    @db.VarChar(36)
+  requested_by      String    @db.VarChar(36)
+  company_id        String    @db.VarChar(36)
+  reason            String
+  status            String    @default("pending") @db.VarChar(50)
+  created_at        DateTime  @default(now()) @db.Timestamp(6)
+  updated_at        DateTime  @default(now()) @db.Timestamp(6)
+  admin_notes       String?
+  processed_at      DateTime?
+  is_archived       Boolean   @default(false)
+  company           companies @relation("CompanyDeletionRequests", fields: [company_id], references: [id])
+  employee          User      @relation("EmployeeDeletionTarget", fields: [employee_id], references: [id])
+  requested_by_user User      @relation("EmployeeDeletionRequester", fields: [requested_by], references: [id])
+
+  @@map("employee_deletion_requests")
+}
+
+model job_assignees {
+  id      String       @id @default(cuid()) @db.VarChar(36)
+  job_id  String       @db.VarChar(36)
+  user_id String       @db.VarChar(36)
+  job     job_postings @relation(fields: [job_id], references: [id])
+
+  @@map("job_assignees")
+}
+
+model ProfileAllocation {
+  id                 String                      @id @default(cuid()) @db.VarChar(36)
+  jobTitle           String                      @db.VarChar(255)
+  jobDescription     String
+  budgetMin          Float?
+  budgetMax          Float?
+  currency           String                      @default("USD") @db.VarChar(10)
+  education          String?
+  experience         String?
+  skills             Json?
+  hiringTimeline     String?                     @db.VarChar(100)
+  location           String?                     @db.VarChar(255)
+  remoteStatus       String                      @default("on-site") @db.VarChar(50)
+  jobType            String                      @default("full-time") @db.VarChar(50)
+  emailNotification  Boolean                     @default(true)
+  portalNotification Boolean                     @default(true)
+  deadline           DateTime?
+  priority           String                      @default("medium") @db.VarChar(20)
+  notes              String?
+  status             String                      @default("active") @db.VarChar(50)
+  createdAt          DateTime                    @default(now()) @db.Timestamp(6)
+  updatedAt          DateTime                    @updatedAt @db.Timestamp(6)
+  createdById        String                      @db.VarChar(36)
+  allocatedEmployees ProfileAllocationEmployee[]
+  createdBy          User                        @relation("ProfileAllocationCreator", fields: [createdById], references: [id])
+  candidates         recruiter_candidates[]
+
+  @@map("profile_allocations")
+}
+
+model ProfileAllocationEmployee {
+  id                  String            @id @default(cuid()) @db.VarChar(36)
+  profileAllocationId String            @db.VarChar(36)
+  employeeId          String            @db.VarChar(36)
+  status              String            @default("pending") @db.VarChar(50)
+  response            String?
+  responseAt          DateTime?
+  notifiedAt          DateTime          @default(now())
+  createdAt           DateTime          @default(now()) @db.Timestamp(6)
+  updatedAt           DateTime          @updatedAt @db.Timestamp(6)
+  employee            User              @relation("ProfileAllocationEmployee", fields: [employeeId], references: [id])
+  profileAllocation   ProfileAllocation @relation(fields: [profileAllocationId], references: [id], onDelete: Cascade)
+
+  @@unique([profileAllocationId, employeeId])
+  @@map("profile_allocation_employees")
+}
+
+model Notification {
+  id        String   @id @default(cuid()) @db.VarChar(36)
+  userId    String   @db.VarChar(36)
+  title     String   @db.VarChar(255)
+  message   String
+  type      String   @db.VarChar(100)
+  relatedId String?  @db.VarChar(36)
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now()) @db.Timestamp(6)
+  updatedAt DateTime @updatedAt @db.Timestamp(6)
+  user      User     @relation("UserNotifications", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+model recruiter_candidates {
+  id                    String             @id @db.VarChar(36)
+  recruiter_id          String             @db.VarChar(36)
+  candidate_id          String             @db.VarChar(36)
+  created_at            DateTime?          @default(now()) @db.Timestamp(6)
+  updated_at            DateTime?          @default(now()) @db.Timestamp(6)
+  profile_allocation_id String?            @db.VarChar(36)
+  status                String?            @default("pending") @db.VarChar(50)
+  feedback              String?
+  candidate             candidates         @relation(fields: [candidate_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_recruiter_candidates_candidate")
+  profileAllocation     ProfileAllocation? @relation(fields: [profile_allocation_id], references: [id], onUpdate: NoAction, map: "fk_recruiter_candidates_profile_allocation")
+  submittedBy           User               @relation(fields: [recruiter_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_recruiter_candidates_recruiter")
+
+  @@unique([recruiter_id, candidate_id])
+  @@index([profile_allocation_id], map: "idx_recruiter_candidates_profile_allocation_id")
+}
