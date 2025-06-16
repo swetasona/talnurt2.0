@@ -5,11 +5,7 @@
   "scripts": {
     "dev": "cross-env NODE_OPTIONS=--max-old-space-size=4096 next dev -p 3000",
     "build": "next build",
-<<<<<<< Updated upstream
     "start": "next start -p ${PORT:-3000} --hostname ${HOSTNAME:-0.0.0.0}",
-=======
-    "start": "next start -p 3001 --hostname 0.0.0.0",
->>>>>>> Stashed changes
     "lint": "next lint",
     "setup:admin": "node scripts/setup-admin.js",
     "cleanup:admin": "node scripts/cleanup-admin.js",
