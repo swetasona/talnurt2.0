@@ -459,7 +459,7 @@ const CandidateDetail: React.FC = () => {
           // Redirect to candidates page after a short delay
           setTimeout(() => {
             console.log('Redirecting to candidates page...');
-            router.push('/admin/candidates');
+            router.push('/admin/my-talent');
           }, 1500);
           
           return;
@@ -485,7 +485,7 @@ const CandidateDetail: React.FC = () => {
         // Redirect to candidates page after a short delay
         setTimeout(() => {
           console.log('Redirecting to candidates page after 404...');
-          router.push('/admin/candidates');
+          router.push('/admin/my-talent');
         }, 1500);
         
         return;
@@ -507,7 +507,7 @@ const CandidateDetail: React.FC = () => {
           // Redirect to candidates page after a short delay
           setTimeout(() => {
             console.log('Redirecting to candidates page...');
-            router.push('/admin/candidates');
+            router.push('/admin/my-talent');
           }, 1500);
           return;
         }
@@ -523,7 +523,7 @@ const CandidateDetail: React.FC = () => {
       // Redirect to candidates page after a short delay
       setTimeout(() => {
         console.log('Redirecting to candidates page...');
-        router.push('/admin/candidates');
+        router.push('/admin/my-talent');
       }, 1500);
       
     } catch (error: any) {
@@ -560,7 +560,7 @@ const CandidateDetail: React.FC = () => {
           <div className="bg-red-100 text-red-700 p-4 rounded-lg">
             <p>{error}</p>
             <div className="mt-4">
-              <Link href="/admin/candidates" className="text-blue-600 hover:underline flex items-center">
+              <Link href="/admin/my-talent" className="text-blue-600 hover:underline flex items-center">
                 <FaArrowLeft className="mr-2" />
                 Back to Candidates
               </Link>
@@ -579,7 +579,7 @@ const CandidateDetail: React.FC = () => {
             <h2 className="text-2xl font-bold mb-2">Candidate not found</h2>
             <p className="mb-4">We couldn't find a candidate with the ID: {id}</p>
             <div className="mt-4">
-              <Link href="/admin/candidates" className="inline-flex items-center text-blue-600 hover:text-blue-800 font-medium">
+              <Link href="/admin/my-talent" className="inline-flex items-center text-blue-600 hover:text-blue-800 font-medium">
                 <FaArrowLeft className="mr-2" />
                 Back to Candidates
               </Link>
@@ -629,7 +629,7 @@ const CandidateDetail: React.FC = () => {
         {/* Header with navigation and actions */}
         <div className="mb-6 flex justify-between items-center">
           <div className="flex items-center">
-            <Link href="/admin/candidates" className="text-blue-600 hover:text-blue-800 flex items-center mr-4">
+            <Link href="/admin/my-talent" className="text-blue-600 hover:text-blue-800 flex items-center mr-4">
               <FaArrowLeft className="mr-2" />
               Back to Candidates
             </Link>
@@ -850,8 +850,8 @@ const CandidateDetail: React.FC = () => {
                   <div className="flex flex-col items-center mb-4">
                     <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mb-4">
                       <FaExclamationTriangle className="h-6 w-6 text-red-600" />
-      </div>
-      
+                    </div>
+                    
                     <h3 className="text-xl font-bold text-gray-800 mb-2">Delete Candidate</h3>
                     
                     <p className="text-center text-gray-600 mb-6">

@@ -671,14 +671,50 @@ export const getCandidates = async (source?: string, exclude?: string) => {
     if (usersTableExists[0].exists) {
       // Get only applicant users (candidates who registered through website)
       // Exclude admin, superadmin, and recruiter roles
-      registeredUsers = await executeQuery(`
-        SELECT u.id, u.name, u.email, p.phone_number as phone,
-               p.github_url, p.linkedin_url, u.created_at
+      // Fix the column references by checking if github_url and linkedin_url columns exist
+      const profileColumnsExist = await executeQuery(`
+        SELECT 
+          EXISTS (
+            SELECT FROM information_schema.columns 
+            WHERE table_schema = 'public' 
+            AND table_name = 'user_profiles' 
+            AND column_name = 'github_url'
+          ) as has_github_url,
+          EXISTS (
+            SELECT FROM information_schema.columns 
+            WHERE table_schema = 'public' 
+            AND table_name = 'user_profiles' 
+            AND column_name = 'linkedin_url'
+          ) as has_linkedin_url
+      `);
+      
+      // Build the query based on available columns
+      let userQuery = `
+        SELECT u.id, u.name, u.email, p.phone_number as phone
+      `;
+      
+      // Add github_url and linkedin_url to the query only if they exist
+      if (profileColumnsExist[0].has_github_url) {
+        userQuery += `, p.github_url`;
+      } else {
+        userQuery += `, NULL as github_url`;
+      }
+      
+      if (profileColumnsExist[0].has_linkedin_url) {
+        userQuery += `, p.linkedin_url`;
+      } else {
+        userQuery += `, NULL as linkedin_url`;
+      }
+      
+      userQuery += `
+        , u.created_at
         FROM users u
         LEFT JOIN user_profiles p ON u.id = p.user_id
         WHERE u.role = 'applicant' OR u.role IS NULL OR u.role = ''
         ORDER BY u.created_at DESC
-      `);
+      `;
+      
+      registeredUsers = await executeQuery(userQuery);
       
       console.log(`Found ${registeredUsers.length} website applicants to include as candidates`);
     }
@@ -1295,14 +1331,48 @@ export const getCandidateById = async (id: string) => {
       `);
       
       if (usersTableCheck[0].exists) {
-        // Try to find the user in the users table
-        const userQuery = `
-          SELECT u.id, u.name, u.email, p.phone_number as phone, 
-                 p.github_url, p.linkedin_url
+        // Check if github_url and linkedin_url columns exist
+        const profileColumnsExist = await executeQuery(`
+          SELECT 
+            EXISTS (
+              SELECT FROM information_schema.columns 
+              WHERE table_schema = 'public' 
+              AND table_name = 'user_profiles' 
+              AND column_name = 'github_url'
+            ) as has_github_url,
+            EXISTS (
+              SELECT FROM information_schema.columns 
+              WHERE table_schema = 'public' 
+              AND table_name = 'user_profiles' 
+              AND column_name = 'linkedin_url'
+            ) as has_linkedin_url
+        `);
+        
+        // Build the query based on available columns
+        let userQuery = `
+          SELECT u.id, u.name, u.email, p.phone_number as phone
+        `;
+        
+        // Add github_url and linkedin_url to the query only if they exist
+        if (profileColumnsExist[0].has_github_url) {
+          userQuery += `, p.github_url`;
+        } else {
+          userQuery += `, NULL as github_url`;
+        }
+        
+        if (profileColumnsExist[0].has_linkedin_url) {
+          userQuery += `, p.linkedin_url`;
+        } else {
+          userQuery += `, NULL as linkedin_url`;
+        }
+        
+        userQuery += `
           FROM users u
           LEFT JOIN user_profiles p ON u.id = p.user_id
           WHERE u.id = $1
         `;
+        
+        // Try to find the user in the users table
         const userResult = await executeQuery(userQuery, [id]);
         
         if (userResult.length > 0) {

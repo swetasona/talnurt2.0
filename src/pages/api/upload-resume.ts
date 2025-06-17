@@ -8,6 +8,8 @@ import { v4 as uuidv4 } from 'uuid';
 export const config = {
   api: {
     bodyParser: false,
+    // Increase the response timeout to 2 minutes
+    responseLimit: false,
   },
 };
 
@@ -57,23 +59,31 @@ export default async function handler(
       });
     }
 
-    // Parse form data
+    // Parse form data with increased timeout
     const form = new IncomingForm({
       uploadDir,
       keepExtensions: true,
       maxFileSize: 10 * 1024 * 1024, // 10MB
-      multiples: false
+      multiples: false,
+      // Increase timeout to 2 minutes
+      maxFields: 10,
+      maxFieldsSize: 10 * 1024 * 1024, // 10MB
     });
 
     console.log('Processing file upload...');
 
-    // Parse the form
-    const formData = await new Promise<{ fields: any; files: any }>((resolve, reject) => {
-      form.parse(req, (err, fields, files) => {
-        if (err) return reject(err);
-        resolve({ fields, files });
-      });
-    });
+    // Parse the form with a timeout promise
+    const formData = await Promise.race([
+      new Promise<{ fields: any; files: any }>((resolve, reject) => {
+        form.parse(req, (err, fields, files) => {
+          if (err) return reject(err);
+          resolve({ fields, files });
+        });
+      }),
+      new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error('File upload timed out after 120 seconds')), 120000)
+      )
+    ]);
 
     console.log('Received form data fields:', Object.keys(formData.fields));
     console.log('Received form data files:', Object.keys(formData.files));
@@ -148,10 +158,19 @@ export default async function handler(
     return res.status(200).json({ 
       success: true,
       fileUrl,
-      filePath: fileUrl // Note: using relative URL, not full path
+      filePath: destinationPath // Return full path for easier processing
     });
   } catch (error: any) {
     console.error('Resume upload error:', error);
+    
+    // Check if it's a timeout error
+    if (error.message && error.message.includes('timed out')) {
+      return res.status(504).json({ 
+        success: false,
+        error: 'File upload timed out. Please try with a smaller file or try again later.'
+      });
+    }
+    
     return res.status(500).json({ 
       success: false,
       error: 'Failed to upload resume: ' + error.message 

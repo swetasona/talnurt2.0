@@ -1,0 +1,13 @@
+node_modules
+.next
+public/uploads
+public/*.jpg
+public/*.png
+build
+dist
+.git
+.env
+.vscode
+coverage
+tmp
+*.log

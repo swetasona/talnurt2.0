@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import AdminLayout from '@/components/Layout/AdminLayout';
-import { FaUserTie, FaTrash, FaPlus, FaEnvelope, FaExclamationTriangle, FaSearch, FaSort, FaSortUp, FaSortDown, FaFilter } from 'react-icons/fa';
+import { FaUserTie, FaTrash, FaPlus, FaEnvelope, FaExclamationTriangle, FaSearch, FaSort, FaSortUp, FaSortDown, FaFilter, FaEye, FaEyeSlash } from 'react-icons/fa';
 import Head from 'next/head';
 import AlertBox from '@/components/shared/AlertBox';
 import axios from 'axios';
@@ -32,6 +32,10 @@ const RecruitersPage: React.FC = () => {
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [uniqueCompanies, setUniqueCompanies] = useState<string[]>([]);
   const [uniqueRoles, setUniqueRoles] = useState<string[]>([]);
+  
+  // Password visibility states
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
   // Alert state
   const [alert, setAlert] = useState({
@@ -496,13 +500,22 @@ const RecruitersPage: React.FC = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Password <span className="text-red-500">*</span>
                   </label>
-                  <input 
-                    type="password"
-                    value={newRecruiter.password}
-                    onChange={(e) => setNewRecruiter({ ...newRecruiter, password: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    placeholder="Create a strong password"
-                  />
+                  <div className="relative">
+                    <input 
+                      type={showPassword ? "text" : "password"}
+                      value={newRecruiter.password}
+                      onChange={(e) => setNewRecruiter({ ...newRecruiter, password: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      placeholder="Create a strong password"
+                    />
+                    <button 
+                      type="button"
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-gray-700"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? <FaEyeSlash size={18} /> : <FaEye size={18} />}
+                    </button>
+                  </div>
                   <p className="text-xs text-gray-500 mt-1">
                     Password must be at least 8 characters long
                   </p>
@@ -512,13 +525,22 @@ const RecruitersPage: React.FC = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Confirm Password <span className="text-red-500">*</span>
                   </label>
-                  <input 
-                    type="password"
-                    value={newRecruiter.confirmPassword}
-                    onChange={(e) => setNewRecruiter({ ...newRecruiter, confirmPassword: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    placeholder="Confirm password"
-                  />
+                  <div className="relative">
+                    <input 
+                      type={showConfirmPassword ? "text" : "password"}
+                      value={newRecruiter.confirmPassword}
+                      onChange={(e) => setNewRecruiter({ ...newRecruiter, confirmPassword: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      placeholder="Confirm password"
+                    />
+                    <button 
+                      type="button"
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-gray-700"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    >
+                      {showConfirmPassword ? <FaEyeSlash size={18} /> : <FaEye size={18} />}
+                    </button>
+                  </div>
                 </div>
                 
                 <div className="md:col-span-2">

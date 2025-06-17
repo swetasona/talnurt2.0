@@ -33,15 +33,21 @@ const parseForm = async (req: NextApiRequest): Promise<{ fields: formidable.Fiel
     // Ensure upload directory exists
     fs.mkdir(uploadDir, { recursive: true })
       .then(() => {
+        console.log(`Upload directory ensured: ${uploadDir}`);
         form.parse(req, (err, fields, files) => {
           if (err) {
+            console.error('Error parsing form:', err);
             reject(err);
             return;
           }
+          console.log('Form parsed successfully');
           resolve({ fields, files });
         });
       })
-      .catch(reject);
+      .catch(error => {
+        console.error('Error creating upload directory:', error);
+        reject(error);
+      });
   });
 };
 
@@ -51,19 +57,40 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
+    console.log('Starting file upload process');
+    
     // Parse the form
     const { files } = await parseForm(req);
-    const fileArray = files.file;
     
-    if (!fileArray || !Array.isArray(fileArray) || fileArray.length === 0) {
+    console.log('Files received:', Object.keys(files));
+    
+    // In formidable v2.1.5, files structure has changed
+    const fileField = files.file;
+    
+    if (!fileField) {
+      console.error('No file field found in the request');
       return res.status(400).json({ error: 'No file uploaded or invalid file type. Only JPG, JPEG, or PNG files are allowed.' });
     }
 
-    const file = fileArray[0];
+    // Get the first file if it's an array, or use the file directly if it's a single file object
+    const file = Array.isArray(fileField) ? fileField[0] : fileField;
+    
+    if (!file) {
+      console.error('No file found in the file field');
+      return res.status(400).json({ error: 'No file uploaded or invalid file type. Only JPG, JPEG, or PNG files are allowed.' });
+    }
+
+    console.log('File received:', {
+      originalFilename: file.originalFilename,
+      filepath: file.filepath,
+      mimetype: file.mimetype,
+      size: file.size
+    });
 
     // Validate file type again on server side
     const fileExt = path.extname(file.originalFilename || '').toLowerCase();
     if (!['.jpg', '.jpeg', '.png'].includes(fileExt)) {
+      console.error(`Invalid file extension: ${fileExt}`);
       // Delete the file that was already uploaded
       await fs.unlink(file.filepath);
       return res.status(400).json({ error: 'Invalid file type. Only JPG, JPEG, or PNG files are allowed.' });
@@ -76,8 +103,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const finalPath = path.join(uploadDir, uniqueFilename);
     await fs.rename(file.filepath, finalPath);
     
+    console.log(`File moved to: ${finalPath}`);
+    
     // Return the URL for the uploaded file
     const fileUrl = `/uploads/companies/${uniqueFilename}`;
+    
+    console.log(`Upload successful, returning URL: ${fileUrl}`);
     
     return res.status(200).json({
       url: fileUrl,

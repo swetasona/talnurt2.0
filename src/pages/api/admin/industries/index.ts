@@ -60,6 +60,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         data: {
           id: uuidv4(),
           name,
+          description,
           created_at: new Date(),
           updated_at: new Date(),
         },

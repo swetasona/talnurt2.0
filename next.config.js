@@ -14,7 +14,7 @@ if (!process.env.NEXTAUTH_URL) {
 }
 
 if (!process.env.NEXTAUTH_SECRET) {
-  process.env.NEXTAUTH_SECRET = 'my-super-secure-nextauth-secret-123!@#';
+  process.env.NEXTAUTH_SECRET = '4c398c042a7bb6e983ad7c0be23a07fe073a4de169291db4cb6e40302b9d1f76';
   console.log('Setting default NEXTAUTH_SECRET (masked):', process.env.NEXTAUTH_SECRET.substring(0, 3) + '...');
 }
 

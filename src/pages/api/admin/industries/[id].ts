@@ -79,6 +79,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         where: { id },
         data: {
           name: name || '',
+          description,
           updated_at: new Date(),
         },
       });

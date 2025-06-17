@@ -2,6 +2,16 @@ import { execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 
+// Configure API to have extended timeout
+export const config = {
+  api: {
+    responseLimit: false,
+    bodyParser: {
+      sizeLimit: '10mb',
+    },
+  },
+};
+
 export default async function handler(req, res) {
   // Always set JSON content type header first
   res.setHeader('Content-Type', 'application/json');
@@ -19,18 +29,26 @@ export default async function handler(req, res) {
     
     console.log('Received request to parse file:', filePath);
     
+    // Check if file is a URL or a local path
+    const isUrl = filePath.startsWith('/uploads/');
+    const fullPath = isUrl 
+      ? path.join(process.cwd(), 'public', filePath) 
+      : filePath;
+    
+    console.log('Full file path to parse:', fullPath);
+    
     // Validate file exists
-    if (!fs.existsSync(filePath)) {
-      console.error(`File not found: ${filePath}`);
+    if (!fs.existsSync(fullPath)) {
+      console.error(`File not found: ${fullPath}`);
       return res.status(400).json({ 
         error: 'File not found', 
-        details: `File at path ${filePath} does not exist`,
+        details: `File at path ${fullPath} does not exist`,
         success: false
       });
     }
     
     // Get file extension
-    const fileExt = path.extname(filePath).toLowerCase();
+    const fileExt = path.extname(fullPath).toLowerCase();
     console.log('File extension:', fileExt);
     
     // Validate file type
@@ -59,25 +77,27 @@ export default async function handler(req, res) {
     process.env.ORIGINAL_FILE_EXTENSION = fileExt.substring(1);
     
     // Execute the parser with a timeout
-    console.log(`Parsing resume file: ${filePath}`);
+    console.log(`Parsing resume file: ${fullPath}`);
     
-    // Create an AbortController to handle timeout
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => {
-      controller.abort();
-    }, 180000); // 3 minute timeout
-    
+    // Create a promise with timeout for the parsing operation
     try {
-      // Execute the parser - ensure paths have double quotes to handle spaces
-      console.log(`Executing: python "${parserScript}" "${filePath}"`);
-      const output = execSync(`python "${parserScript}" "${filePath}"`, {
-        encoding: 'utf8',
-        maxBuffer: 1024 * 1024 * 10, // 10MB buffer
-        timeout: 180000 // 3 minute timeout
-      });
+      // Execute the parser with increased timeout - ensure paths have double quotes to handle spaces
+      console.log(`Executing: python "${parserScript}" "${fullPath}"`);
       
-      // Clear the timeout since we got a response
-      clearTimeout(timeoutId);
+      // Use a promise with timeout to handle the execution
+      const output = await Promise.race([
+        new Promise((resolve) => {
+          const result = execSync(`python "${parserScript}" "${fullPath}"`, {
+            encoding: 'utf8',
+            maxBuffer: 1024 * 1024 * 20, // 20MB buffer
+            timeout: 300000 // 5 minute timeout (increased from 3 minutes)
+          });
+          resolve(result);
+        }),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Parser execution timed out after 5 minutes')), 300000)
+        )
+      ]);
       
       // Check for empty output
       if (!output || output.trim() === '') {
@@ -98,8 +118,8 @@ export default async function handler(req, res) {
         
         // Add path info to result
         result.fileInfo = {
-          filePath,
-          filename: path.basename(filePath),
+          filePath: fullPath,
+          filename: path.basename(fullPath),
           extension: fileExt
         };
         
@@ -133,14 +153,11 @@ export default async function handler(req, res) {
         });
       }
     } catch (execError) {
-      // Clear the timeout since we got an error
-      clearTimeout(timeoutId);
-      
       console.error('Error executing parser:', execError);
       
       // Check if the error is due to timeout
-      if (execError.signal === 'SIGTERM' || execError.message.includes('timeout')) {
-        return res.status(500).json({ 
+      if (execError.signal === 'SIGTERM' || execError.message.includes('timeout') || execError.message.includes('timed out')) {
+        return res.status(504).json({ 
           error: 'Parser execution timed out', 
           details: 'The parsing process took too long and was terminated. Try with a simpler resume or try again later.',
           success: false

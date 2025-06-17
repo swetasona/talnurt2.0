@@ -1,0 +1,4 @@
+# This is a manually created migration
+
+migration_name = "20250710_add_description_to_industries"
+provider = "postgresql" 
